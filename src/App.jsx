@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import OrdersPage from './pages/Orders/OrdersPage';
 import UsersPage from './pages/Users/UsersPage';
 import ReportsPage from './pages/Reports/ReportsPage';
+import ProductsCategoriesPage from './pages/Products/ProductsCategoriesPage';
 
 function App() {
   const { isAuthenticated } = useAuth();
@@ -31,8 +32,9 @@ function App() {
 
         {/* Placeholder routes for sidebar links (to be built out later) */}
         <Route path="/users" element={<UsersPage />} />
-        <Route path="/categories" element={<Placeholder title="Categories" />} />
-        <Route path="/products" element={<Placeholder title="Products" />} />
+        <Route path="/products-categories" element={<ProductsCategoriesPage />} />
+        <Route path="/categories" element={<ProductsCategoriesPage />} />
+        <Route path="/products" element={<ProductsCategoriesPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/payments" element={<Placeholder title="Payments" />} />
         <Route path="/roles" element={<Placeholder title="Roles" />} />

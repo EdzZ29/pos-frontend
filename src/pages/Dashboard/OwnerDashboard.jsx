@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { orderService, productService, categoryService, userService, paymentService } from '../../api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  FiShoppingBag, FiFileText, FiUsers, FiDollarSign,
+  FiFileText, FiDollarSign,
   FiClock, FiCheckCircle, FiXCircle,
-  FiPlus, FiEdit2, FiTrash2, FiX, FiPackage, FiTag,
-  FiCalendar,
+  FiPlus, FiX, FiTrash2,
+  FiCalendar, FiShoppingCart, FiArrowRight, FiMinus, FiCheck,
+  FiArrowLeft, FiPrinter, FiCreditCard, FiPercent,
 } from 'react-icons/fi';
 
 /* ─── tiny helpers ─── */
@@ -62,28 +63,49 @@ export default function OwnerDashboard() {
     revenue: 0, totalSales: 0, pendingOrders: 0, completedOrders: 0, cancelledOrders: 0,
   });
 
-  /* tabs */
-  const [activeTab, setActiveTab] = useState('overview'); // overview | products | categories
-
-  /* product form */
-  const emptyProduct = { name: '', description: '', price: '', stock: '0', category_id: '', image: '' };
-  const [productForm, setProductForm] = useState(emptyProduct);
-  const [editingProduct, setEditingProduct] = useState(null);
-  const [showProductModal, setShowProductModal] = useState(false);
-  const [productSaving, setProductSaving] = useState(false);
-
-  /* category form */
-  const emptyCategory = { name: '', description: '' };
-  const [categoryForm, setCategoryForm] = useState(emptyCategory);
-  const [editingCategory, setEditingCategory] = useState(null);
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [categorySaving, setCategorySaving] = useState(false);
-
   /* pagination */
   const [ordersPage, setOrdersPage] = useState(1);
-  const [productsPage, setProductsPage] = useState(1);
-  const [categoriesPage, setCategoriesPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
+
+  /* order modal – restore from sessionStorage */
+  const _savedModal = () => {
+    try {
+      const raw = sessionStorage.getItem('pos_owner_order_modal');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  };
+  const _saved = _savedModal();
+
+  const [orderModalOpen, setOrderModalOpen] = useState(_saved?.open ?? false);
+  const [cart, setCart] = useState(_saved?.cart ?? []);
+  const [orderType, setOrderType] = useState(_saved?.orderType ?? 'dine-in');
+  const [menuCategory, setMenuCategory] = useState(_saved?.menuCategory ?? 'all');
+  const [orderStep, setOrderStep] = useState(_saved?.orderStep ?? 1);
+  const [submitting, setSubmitting] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(_saved?.selectedPaymentMethod ?? null);
+  const [discountType, setDiscountType] = useState(_saved?.discountType ?? 'none');
+  const [amountPaid, setAmountPaid] = useState(_saved?.amountPaid ?? '');
+  const [receiptData, setReceiptData] = useState(null);
+  const receiptRef = useRef(null);
+
+  /* persist modal state to sessionStorage */
+  useEffect(() => {
+    if (orderModalOpen && orderStep < 4) {
+      sessionStorage.setItem('pos_owner_order_modal', JSON.stringify({
+        open: true,
+        cart,
+        orderType,
+        menuCategory,
+        orderStep,
+        selectedPaymentMethod,
+        discountType,
+        amountPaid,
+      }));
+    } else {
+      sessionStorage.removeItem('pos_owner_order_modal');
+    }
+  }, [orderModalOpen, cart, orderType, menuCategory, orderStep, selectedPaymentMethod, discountType, amountPaid]);
 
   /* ── fetch all data ── */
   const fetchAll = async () => {
@@ -126,112 +148,122 @@ export default function OwnerDashboard() {
 
   useEffect(() => { fetchAll(); }, []);
 
-  /* ── Product CRUD ── */
-  const openAddProduct = () => {
-    setEditingProduct(null);
-    setProductForm(emptyProduct);
-    setShowProductModal(true);
-  };
-  const openEditProduct = (p) => {
-    setEditingProduct(p);
-    setProductForm({
-      name: p.name,
-      description: p.description || '',
-      price: String(p.price),
-      stock: String(p.stock ?? 0),
-      category_id: String(p.category_id),
-      image: p.image || '',
-    });
-    setShowProductModal(true);
-  };
-  const saveProduct = async () => {
-    if (!productForm.name || !productForm.price || !productForm.category_id) return;
-    setProductSaving(true);
-    try {
-      const payload = {
-        ...productForm,
-        price: parseFloat(productForm.price),
-        stock: parseInt(productForm.stock) || 0,
-        category_id: parseInt(productForm.category_id),
-      };
-      if (editingProduct) {
-        const updated = await productService.update(editingProduct.id, payload);
-        setProducts((prev) => prev.map((p) => (p.id === editingProduct.id ? { ...p, ...updated } : p)));
-      } else {
-        const created = await productService.create(payload);
-        setProducts((prev) => [created, ...prev]);
-      }
-      setShowProductModal(false);
-      setStats((s) => ({ ...s, products: editingProduct ? s.products : s.products + 1 }));
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || 'Failed to save product');
-    } finally {
-      setProductSaving(false);
+  /* if modal was restored from session, reload products + payment methods */
+  useEffect(() => {
+    if (_saved?.open) {
+      loadPaymentMethods();
     }
-  };
-  const deleteProduct = async (id) => {
-    if (!confirm('Delete this product?')) return;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── Order modal helpers ── */
+  const loadPaymentMethods = async () => {
     try {
-      await productService.delete(id);
-      setProducts((prev) => prev.filter((p) => p.id !== id));
-      setStats((s) => ({ ...s, products: s.products - 1 }));
+      const methods = await paymentService.getMethods();
+      setPaymentMethods(methods);
+      if (methods.length > 0 && !selectedPaymentMethod) setSelectedPaymentMethod(methods[0].id);
     } catch (err) {
-      alert('Failed to delete product');
+      console.error('Failed to load payment methods', err);
     }
   };
 
-  /* ── Category CRUD ── */
-  const openAddCategory = () => {
-    setEditingCategory(null);
-    setCategoryForm(emptyCategory);
-    setShowCategoryModal(true);
+  const openOrderModal = async () => {
+    setOrderModalOpen(true);
+    fetchAll();
+    loadPaymentMethods();
   };
-  const openEditCategory = (c) => {
-    setEditingCategory(c);
-    setCategoryForm({ name: c.name, description: c.description || '' });
-    setShowCategoryModal(true);
+
+  const addToCart = (product) => {
+    const existing = cart.find((c) => c.product_id === product.id);
+    if (existing) {
+      setCart(cart.map((c) => c.product_id === product.id ? { ...c, quantity: c.quantity + 1 } : c));
+    } else {
+      setCart([...cart, { product_id: product.id, name: product.name, unit_price: parseFloat(product.price), quantity: 1 }]);
+    }
   };
-  const saveCategory = async () => {
-    if (!categoryForm.name) return;
-    setCategorySaving(true);
-    try {
-      if (editingCategory) {
-        const updated = await categoryService.update(editingCategory.id, categoryForm);
-        setCategories((prev) => prev.map((c) => (c.id === editingCategory.id ? { ...c, ...updated } : c)));
-      } else {
-        const created = await categoryService.create(categoryForm);
-        setCategories((prev) => [created, ...prev]);
+
+  const removeFromCart = (productId) => setCart(cart.filter((c) => c.product_id !== productId));
+
+  const updateQuantity = (productId, delta) => {
+    setCart(cart.map((c) => {
+      if (c.product_id === productId) {
+        const newQty = c.quantity + delta;
+        return newQty > 0 ? { ...c, quantity: newQty } : c;
       }
-      setShowCategoryModal(false);
-      setStats((s) => ({ ...s, categories: editingCategory ? s.categories : s.categories + 1 }));
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to save category');
-    } finally {
-      setCategorySaving(false);
-    }
+      return c;
+    }).filter((c) => c.quantity > 0));
   };
-  const deleteCategory = async (id) => {
-    if (!confirm('Delete this category? Products under it may become orphaned.')) return;
+
+  const cartTotal = cart.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const discountRate = discountType === 'senior' || discountType === 'pwd' ? 0.20 : 0;
+  const discountAmount = Math.round(cartTotal * discountRate * 100) / 100;
+  const finalTotal = cartTotal - discountAmount;
+  const changeAmount = amountPaid ? Math.max(0, parseFloat(amountPaid) - finalTotal) : 0;
+
+  const completeOrder = async () => {
+    if (cart.length === 0 || submitting || !selectedPaymentMethod) return;
+    if (!amountPaid || parseFloat(amountPaid) < finalTotal) {
+      alert('Amount paid must be at least ₱' + finalTotal.toFixed(2));
+      return;
+    }
+    setSubmitting(true);
     try {
-      await categoryService.delete(id);
-      setCategories((prev) => prev.filter((c) => c.id !== id));
-      setStats((s) => ({ ...s, categories: s.categories - 1 }));
+      const payload = {
+        order_type: orderType,
+        discount_type: discountType,
+        items: cart.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        })),
+      };
+      const newOrder = await orderService.create(payload);
+      await paymentService.create({
+        order_id: newOrder.id,
+        payment_method_id: selectedPaymentMethod,
+        amount_paid: parseFloat(amountPaid),
+      });
+      const receipt = await orderService.getReceipt(newOrder.id);
+      setReceiptData(receipt);
+      setRecentOrders((prev) => [newOrder, ...prev]);
+      setStats((prev) => ({
+        ...prev,
+        orders: prev.orders + 1,
+        completedOrders: prev.completedOrders + 1,
+        revenue: prev.revenue + parseFloat(amountPaid),
+        totalSales: prev.totalSales + finalTotal,
+      }));
+      setOrderStep(4);
     } catch (err) {
-      alert('Failed to delete category');
+      console.error('Failed to create order', err);
+      alert(err.response?.data?.message || 'Failed to create order');
+    } finally {
+      setSubmitting(false);
     }
   };
+
+  const resetOrderModal = () => {
+    setCart([]);
+    setOrderType('dine-in');
+    setMenuCategory('all');
+    setOrderStep(1);
+    setSelectedPaymentMethod(null);
+    setDiscountType('none');
+    setAmountPaid('');
+    setReceiptData(null);
+    setOrderModalOpen(false);
+    sessionStorage.removeItem('pos_owner_order_modal');
+  };
+
+  const filteredMenuProducts = menuCategory === 'all'
+    ? products.filter((p) => p.is_available !== false)
+    : products.filter((p) => p.category_id === parseInt(menuCategory) && p.is_available !== false);
 
   useEffect(() => { fetchAll(); }, []);
 
   /* paginated data */
   const paginatedOrders = recentOrders.slice((ordersPage - 1) * ITEMS_PER_PAGE, ordersPage * ITEMS_PER_PAGE);
   const totalOrderPages = Math.max(1, Math.ceil(recentOrders.length / ITEMS_PER_PAGE));
-  const paginatedProducts = products.slice((productsPage - 1) * ITEMS_PER_PAGE, productsPage * ITEMS_PER_PAGE);
-  const totalProductPages = Math.max(1, Math.ceil(products.length / ITEMS_PER_PAGE));
-  const CATS_PER_PAGE = 9;
-  const paginatedCategories = categories.slice((categoriesPage - 1) * CATS_PER_PAGE, categoriesPage * CATS_PER_PAGE);
-  const totalCategoryPages = Math.max(1, Math.ceil(categories.length / CATS_PER_PAGE));
 
   return (
     <div className="p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
@@ -259,44 +291,40 @@ export default function OwnerDashboard() {
         </div>
       </motion.div>
 
-      {/* Tab bar */}
-      <div className="flex gap-2 mb-8">
-        {[
-          { key: 'overview', label: 'Overview', icon: <FiFileText size={14} /> },
-          { key: 'products', label: 'Products', icon: <FiPackage size={14} /> },
-          { key: 'categories', label: 'Categories', icon: <FiTag size={14} /> },
-        ].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
-            style={{
-              background: activeTab === t.key ? gold : 'rgba(255,255,255,0.04)',
-              color: activeTab === t.key ? '#000' : 'rgba(255,255,255,0.6)',
-              border: activeTab === t.key ? 'none' : '1px solid rgba(255,255,255,0.08)',
-            }}
+      {/* Take New Order button */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="mb-8"
           >
-            {t.icon} {t.label}
-          </button>
-        ))}
-      </div>
+            <button
+              onClick={openOrderModal}
+              className="w-full sm:w-1/2 py-5 px-6 rounded-2xl flex items-center justify-between group transition-all duration-300"
+              style={{
+                background: 'linear-gradient(135deg, #d4af37, #b38f2c)',
+                boxShadow: '0 8px 20px rgba(212,175,55,0.3)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 12px 28px rgba(212,175,55,0.45)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 8px 20px rgba(212,175,55,0.3)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                  <FiPlus size={24} className="text-white" />
+                </div>
+                <div className="text-left">
+                  <span className="text-xl font-bold block text-white">Take New Order</span>
+                  <span className="text-white/70 text-sm">Start a new transaction</span>
+                </div>
+              </div>
+              <FiArrowRight size={24} className="text-white group-hover:translate-x-1 transition-transform" />
+            </button>
+          </motion.div>
 
-      {/* ═══════════════ OVERVIEW TAB ═══════════════ */}
-      {activeTab === 'overview' && (
-        <>
-          {/* Stat cards */}
+          {/* Stat card */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <StatCard icon={<FiDollarSign size={20} />} label="Total Revenue"
               value={`₱${stats.revenue.toLocaleString('en', { minimumFractionDigits: 2 })}`} color={gold} />
-            <StatCard icon={<FiFileText size={20} />} label="Total Orders" value={stats.orders} color="#60a5fa" />
-            <StatCard icon={<FiShoppingBag size={20} />} label="Products" value={stats.products} color="#34d399" />
-            <StatCard icon={<FiUsers size={20} />} label="Users" value={stats.users} color="#f472b6" />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <StatCard icon={<FiClock size={20} />} label="Pending" value={stats.pendingOrders} color="#fbbf24" />
-            <StatCard icon={<FiCheckCircle size={20} />} label="Completed" value={stats.completedOrders} color="#34d399" />
-            <StatCard icon={<FiXCircle size={20} />} label="Cancelled" value={stats.cancelledOrders} color="#f87171" />
           </div>
 
           {/* Recent orders table */}
@@ -367,304 +395,530 @@ export default function OwnerDashboard() {
               </div>
             )}
           </motion.div>
-        </>
-      )}
 
-      {/* ═══════════════ PRODUCTS TAB ═══════════════ */}
-      {activeTab === 'products' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold" style={{ color: '#f5f0e8' }}>
-              All Products <span className="text-sm font-normal ml-2" style={{ color: 'rgba(255,255,255,0.4)' }}>({products.length})</span>
-            </h2>
-            <button onClick={openAddProduct}
-              className="px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all hover:opacity-90"
-              style={{ background: `linear-gradient(135deg, ${gold}, #b38f2c)`, color: '#000' }}>
-              <FiPlus size={16} /> Add Product
-            </button>
-          </div>
-
-          {products.length === 0 ? (
-            <div className="rounded-xl p-12 text-center" style={{ background: panelBg, border: panelBorder }}>
-              <FiPackage size={48} className="mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.15)' }} />
-              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>No products yet. Add your first product!</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {paginatedProducts.map((p) => (
-                <motion.div key={p.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                  className="rounded-xl p-4 flex flex-col" style={{ background: panelBg, border: panelBorder }}>
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm truncate" style={{ color: '#f5f0e8' }}>{p.name}</h3>
-                      <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                        {p.category?.name || 'No category'}
-                      </p>
-                    </div>
-                    <span className={`text-[10px] uppercase px-2 py-0.5 rounded-md font-bold ${p.is_available !== false ? '' : ''}`}
-                      style={{
-                        background: p.is_available !== false ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)',
-                        color: p.is_available !== false ? '#34d399' : '#f87171',
-                      }}>
-                      {p.is_available !== false ? 'Available' : 'Unavailable'}
-                    </span>
-                  </div>
-
-                  {p.description && (
-                    <p className="text-xs mb-3 line-clamp-2" style={{ color: 'rgba(255,255,255,0.35)' }}>{p.description}</p>
-                  )}
-
-                  <div className="mt-auto flex items-center justify-between pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div>
-                      <p className="text-lg font-bold" style={{ color: gold }}>₱{parseFloat(p.price).toLocaleString('en', { minimumFractionDigits: 2 })}</p>
-                      <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Stock: {p.stock ?? '∞'}</p>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <button onClick={() => openEditProduct(p)}
-                        className="p-2 rounded-lg transition hover:bg-white/10" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                        <FiEdit2 size={14} />
-                      </button>
-                      <button onClick={() => deleteProduct(p.id)}
-                        className="p-2 rounded-lg transition hover:bg-red-500/20" style={{ color: '#f87171' }}>
-                        <FiTrash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
-          {totalProductPages > 1 && (
-            <div className="flex items-center justify-between mt-4 px-1">
-              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                Page {productsPage} of {totalProductPages} ({products.length} products)
-              </span>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setProductsPage((p) => Math.max(1, p - 1))} disabled={productsPage === 1}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
-                  style={{ background: 'rgba(255,255,255,0.06)', color: '#f5f0e8' }}>
-                  ← Prev
-                </button>
-                <span className="text-xs px-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  {productsPage} / {totalProductPages}
-                </span>
-                <button onClick={() => setProductsPage((p) => Math.min(totalProductPages, p + 1))} disabled={productsPage === totalProductPages}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
-                  style={{ background: 'rgba(255,255,255,0.06)', color: '#f5f0e8' }}>
-                  Next →
-                </button>
-              </div>
-            </div>
-          )}
-        </motion.div>
-      )}
-
-      {/* ═══════════════ CATEGORIES TAB ═══════════════ */}
-      {activeTab === 'categories' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold" style={{ color: '#f5f0e8' }}>
-              All Categories <span className="text-sm font-normal ml-2" style={{ color: 'rgba(255,255,255,0.4)' }}>({categories.length})</span>
-            </h2>
-            <button onClick={openAddCategory}
-              className="px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all hover:opacity-90"
-              style={{ background: `linear-gradient(135deg, ${gold}, #b38f2c)`, color: '#000' }}>
-              <FiPlus size={16} /> Add Category
-            </button>
-          </div>
-
-          {categories.length === 0 ? (
-            <div className="rounded-xl p-12 text-center" style={{ background: panelBg, border: panelBorder }}>
-              <FiTag size={48} className="mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.15)' }} />
-              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>No categories yet. Add your first category!</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {paginatedCategories.map((c) => {
-                const count = products.filter((p) => p.category_id === c.id).length;
-                return (
-                  <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                    className="rounded-xl p-5 flex items-start justify-between" style={{ background: panelBg, border: panelBorder }}>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm" style={{ color: '#f5f0e8' }}>{c.name}</h3>
-                      {c.description && <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{c.description}</p>}
-                      <p className="text-[11px] mt-2" style={{ color: gold }}>{count} product{count !== 1 ? 's' : ''}</p>
-                    </div>
-                    <div className="flex gap-1.5 ml-3">
-                      <button onClick={() => openEditCategory(c)}
-                        className="p-2 rounded-lg transition hover:bg-white/10" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                        <FiEdit2 size={14} />
-                      </button>
-                      <button onClick={() => deleteCategory(c.id)}
-                        className="p-2 rounded-lg transition hover:bg-red-500/20" style={{ color: '#f87171' }}>
-                        <FiTrash2 size={14} />
-                      </button>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-          {totalCategoryPages > 1 && (
-            <div className="flex items-center justify-between mt-4 px-1">
-              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                Page {categoriesPage} of {totalCategoryPages} ({categories.length} categories)
-              </span>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setCategoriesPage((p) => Math.max(1, p - 1))} disabled={categoriesPage === 1}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
-                  style={{ background: 'rgba(255,255,255,0.06)', color: '#f5f0e8' }}>
-                  ← Prev
-                </button>
-                <span className="text-xs px-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  {categoriesPage} / {totalCategoryPages}
-                </span>
-                <button onClick={() => setCategoriesPage((p) => Math.min(totalCategoryPages, p + 1))} disabled={categoriesPage === totalCategoryPages}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
-                  style={{ background: 'rgba(255,255,255,0.06)', color: '#f5f0e8' }}>
-                  Next →
-                </button>
-              </div>
-            </div>
-          )}
-        </motion.div>
-      )}
-
-      {/* ═══════════════ PRODUCT MODAL ═══════════════ */}
+      {/* ═══════════════ ORDER MODAL ═══════════════ */}
       <AnimatePresence>
-        {showProductModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        {orderModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}
-            onClick={() => setShowProductModal(false)}>
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+            onClick={() => resetOrderModal()}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg rounded-2xl overflow-hidden"
-              style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.1)' }}>
-
+              className="w-full max-w-6xl overflow-hidden rounded-2xl flex flex-col"
+              style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.1)', height: '85vh', fontFamily: "'Inria Sans', sans-serif" }}
+            >
+              {/* Modal Header */}
               <div className="p-5 flex items-center justify-between" style={{ borderBottom: panelBorder }}>
-                <h2 className="text-lg font-bold" style={{ color: '#f5f0e8' }}>
-                  {editingProduct ? 'Edit Product' : 'Add New Product'}
-                </h2>
-                <button onClick={() => setShowProductModal(false)} className="p-2 rounded-lg hover:bg-white/10 transition" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                <div className="flex items-center gap-6">
+                  <h2 className="text-xl font-bold" style={{ color: '#f5f0e8' }}>New Order</h2>
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4].map((step) => (
+                      <div key={step} className="flex items-center">
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{
+                            background: orderStep >= step ? gold : 'rgba(255,255,255,0.1)',
+                            color: orderStep >= step ? '#000' : 'rgba(255,255,255,0.4)',
+                          }}>
+                          {orderStep > step ? <FiCheck size={14} /> : step}
+                        </div>
+                        <span className="ml-1.5 text-xs font-medium hidden md:block"
+                          style={{ color: orderStep >= step ? gold : 'rgba(255,255,255,0.4)' }}>
+                          {step === 1 ? 'Items' : step === 2 ? 'Payment' : step === 3 ? 'Confirm' : 'Receipt'}
+                        </span>
+                        {step < 4 && <div className="w-6 h-0.5 mx-2" style={{ background: orderStep > step ? gold : 'rgba(255,255,255,0.1)' }} />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <button onClick={resetOrderModal} className="p-2 rounded-lg hover:bg-white/10 transition" style={{ color: 'rgba(255,255,255,0.6)' }}>
                   <FiX size={20} />
                 </button>
               </div>
 
-              <div className="p-5 space-y-4">
-                {/* Name */}
-                <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-semibold mb-1"
-                    style={{ color: 'rgba(255,255,255,0.4)' }}>Product Name *</label>
-                  <input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-lg text-sm" style={inputStyle} placeholder="e.g. Lechon Kawali" />
-                </div>
+              <div className="flex-1 overflow-hidden flex">
+                {/* ── STEP 1: Select Items ── */}
+                {orderStep === 1 && (
+                  <>
+                    {/* Menu */}
+                    <div className="flex-1 p-5 overflow-y-auto" style={{ borderRight: panelBorder }}>
+                      <div className="flex flex-wrap gap-2 mb-5">
+                        <button
+                          onClick={() => setMenuCategory('all')}
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize"
+                          style={{
+                            background: menuCategory === 'all' ? gold : 'rgba(255,255,255,0.04)',
+                            color: menuCategory === 'all' ? '#000' : 'rgba(255,255,255,0.6)',
+                            border: menuCategory === 'all' ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                          }}
+                        >
+                          All
+                        </button>
+                        {categories.map((cat) => (
+                          <button
+                            key={cat.id}
+                            onClick={() => setMenuCategory(String(cat.id))}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize"
+                            style={{
+                              background: menuCategory === String(cat.id) ? gold : 'rgba(255,255,255,0.04)',
+                              color: menuCategory === String(cat.id) ? '#000' : 'rgba(255,255,255,0.6)',
+                              border: menuCategory === String(cat.id) ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                            }}
+                          >
+                            {cat.name}
+                          </button>
+                        ))}
+                      </div>
 
-                {/* Category */}
-                <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-semibold mb-1"
-                    style={{ color: 'rgba(255,255,255,0.4)' }}>Category *</label>
-                  <select value={productForm.category_id}
-                    onChange={(e) => setProductForm({ ...productForm, category_id: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-lg text-sm" style={inputStyle}>
-                    <option value="" style={{ color: '#000', background: '#fff' }}>Select a category</option>
-                    {categories.map((c) => <option key={c.id} value={c.id} style={{ color: '#000', background: '#fff' }}>{c.name}</option>)}
-                  </select>
-                </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {filteredMenuProducts.length === 0 ? (
+                          <p className="col-span-full text-center py-8 text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                            No products found.
+                          </p>
+                        ) : (
+                          filteredMenuProducts.map((product) => (
+                            <motion.button
+                              key={product.id}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => addToCart(product)}
+                              className="p-4 rounded-xl text-left transition-all"
+                              style={{ background: 'rgba(255,255,255,0.03)', border: panelBorder }}
+                            >
+                              <p className="font-medium text-sm mb-1" style={{ color: '#f5f0e8' }}>{product.name}</p>
+                              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{product.category?.name}</p>
+                              <p className="text-sm font-bold mt-2" style={{ color: gold }}>
+                                ₱{parseFloat(product.price).toLocaleString('en', { minimumFractionDigits: 2 })}
+                              </p>
+                            </motion.button>
+                          ))
+                        )}
+                      </div>
+                    </div>
 
-                {/* Price & Stock */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[11px] uppercase tracking-wider font-semibold mb-1"
-                      style={{ color: 'rgba(255,255,255,0.4)' }}>Price (₱) *</label>
-                    <input type="number" step="0.01" min="0" value={productForm.price}
-                      onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-lg text-sm" style={inputStyle} placeholder="0.00" />
+                    {/* Cart sidebar */}
+                    <div className="w-80 flex flex-col" style={{ background: 'rgba(10,10,10,0.5)' }}>
+                      <div className="p-5" style={{ borderBottom: panelBorder }}>
+                        <h3 className="text-sm font-bold mb-4" style={{ color: '#f5f0e8' }}>Current Order</h3>
+                        <div className="flex gap-2">
+                          {['dine-in', 'takeout', 'delivery'].map((t) => (
+                            <button key={t} onClick={() => setOrderType(t)}
+                              className="flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all"
+                              style={{
+                                background: orderType === t ? gold : 'rgba(255,255,255,0.04)',
+                                color: orderType === t ? '#000' : 'rgba(255,255,255,0.6)',
+                                border: orderType === t ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                              }}>
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto p-5">
+                        {cart.length === 0 ? (
+                          <div className="text-center py-8" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                            <FiShoppingCart size={40} className="mx-auto mb-3 opacity-50" />
+                            <p className="text-sm">No items yet</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {cart.map((item) => (
+                              <div key={item.product_id} className="flex items-center gap-3 p-3 rounded-lg"
+                                style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-xs truncate" style={{ color: '#f5f0e8' }}>{item.name}</p>
+                                  <p className="text-[11px]" style={{ color: gold }}>₱{item.unit_price.toFixed(2)}</p>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <button onClick={() => updateQuantity(item.product_id, -1)}
+                                    className="w-6 h-6 rounded-full flex items-center justify-center"
+                                    style={{ background: 'rgba(255,255,255,0.1)' }}>
+                                    <FiMinus size={12} style={{ color: '#f5f0e8' }} />
+                                  </button>
+                                  <span className="w-5 text-center text-xs font-medium" style={{ color: '#f5f0e8' }}>{item.quantity}</span>
+                                  <button onClick={() => updateQuantity(item.product_id, 1)}
+                                    className="w-6 h-6 rounded-full flex items-center justify-center"
+                                    style={{ background: gold }}>
+                                    <FiPlus size={12} style={{ color: '#000' }} />
+                                  </button>
+                                </div>
+                                <button onClick={() => removeFromCart(item.product_id)}
+                                  className="p-1.5 hover:bg-red-500/20 rounded-lg transition" style={{ color: '#f87171' }}>
+                                  <FiTrash2 size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-5" style={{ borderTop: panelBorder }}>
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Subtotal ({cartItemCount} items)</span>
+                          <span className="text-lg font-bold" style={{ color: gold }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <button
+                          onClick={() => setOrderStep(2)}
+                          disabled={cart.length === 0}
+                          className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                          style={{
+                            background: cart.length > 0 ? `linear-gradient(135deg, ${gold}, #b38f2c)` : 'rgba(255,255,255,0.1)',
+                            color: cart.length > 0 ? '#000' : 'rgba(255,255,255,0.3)',
+                            cursor: cart.length > 0 ? 'pointer' : 'not-allowed',
+                          }}>
+                          Review Order <FiArrowRight size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ── STEP 2: Payment & Discount ── */}
+                {orderStep === 2 && (
+                  <div className="flex-1 p-8 overflow-y-auto flex items-center justify-center">
+                    <div className="max-w-lg w-full">
+                      <div className="text-center mb-6">
+                        <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
+                          style={{ background: 'rgba(212,175,55,0.15)' }}>
+                          <FiCreditCard size={28} style={{ color: gold }} />
+                        </div>
+                        <h3 className="text-xl font-bold" style={{ color: '#f5f0e8' }}>Payment & Discount</h3>
+                        <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Select payment method and applicable discount</p>
+                      </div>
+
+                      <div className="mb-6">
+                        <label className="text-xs font-semibold uppercase tracking-wider mb-3 block" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                          Payment Method
+                        </label>
+                        <div className="grid grid-cols-3 gap-3">
+                          {paymentMethods.map((method) => {
+                            const colorMap = {
+                              cash:  { bg: 'rgba(34,197,94,0.15)',  border: '#22c55e', text: '#22c55e' },
+                              gcash: { bg: 'rgba(59,130,246,0.15)', border: '#3b82f6', text: '#3b82f6' },
+                              card:  { bg: 'rgba(245,158,11,0.15)', border: '#f59e0b', text: '#ef4444' },
+                            };
+                            const key = method.name.toLowerCase();
+                            const c = colorMap[key] || { bg: 'rgba(212,175,55,0.15)', border: gold, text: gold };
+                            const active = selectedPaymentMethod === method.id;
+                            return (
+                              <button
+                                key={method.id}
+                                onClick={() => setSelectedPaymentMethod(method.id)}
+                                className="p-4 rounded-xl text-center transition-all"
+                                style={{
+                                  background: active ? c.bg : 'rgba(255,255,255,0.03)',
+                                  border: active ? `2px solid ${c.border}` : '1px solid rgba(255,255,255,0.08)',
+                                }}
+                              >
+                                <FiCreditCard size={20} className="mx-auto mb-2" style={{ color: active ? c.text : 'rgba(255,255,255,0.5)' }} />
+                                <span className="text-sm font-medium" style={{ color: active ? c.text : '#f5f0e8' }}>
+                                  {method.name}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="mb-6">
+                        <label className="text-xs font-semibold uppercase tracking-wider mb-3 block" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                          Discount (20% off)
+                        </label>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            { key: 'none', label: 'None', icon: <FiX size={18} /> },
+                            { key: 'senior', label: 'Senior Citizen', icon: <FiPercent size={18} /> },
+                            { key: 'pwd', label: 'PWD', icon: <FiPercent size={18} /> },
+                          ].map((opt) => (
+                            <button
+                              key={opt.key}
+                              onClick={() => setDiscountType(opt.key)}
+                              className="p-4 rounded-xl text-center transition-all"
+                              style={{
+                                background: discountType === opt.key ? (opt.key === 'none' ? 'rgba(255,255,255,0.06)' : 'rgba(52,211,153,0.12)') : 'rgba(255,255,255,0.03)',
+                                border: discountType === opt.key ? (opt.key === 'none' ? '2px solid rgba(255,255,255,0.3)' : '2px solid #34d399') : '1px solid rgba(255,255,255,0.08)',
+                              }}
+                            >
+                              <span className="block mx-auto mb-2" style={{ color: discountType === opt.key ? (opt.key === 'none' ? '#f5f0e8' : '#34d399') : 'rgba(255,255,255,0.5)' }}>
+                                {opt.icon}
+                              </span>
+                              <span className="text-xs font-medium" style={{ color: discountType === opt.key ? (opt.key === 'none' ? '#f5f0e8' : '#34d399') : 'rgba(255,255,255,0.6)' }}>
+                                {opt.label}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-xl mb-6" style={{ background: 'rgba(255,255,255,0.03)', border: panelBorder }}>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Subtotal ({cartItemCount} items)</span>
+                          <span style={{ color: '#f5f0e8' }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        {discountType !== 'none' && (
+                          <div className="flex justify-between text-sm mb-2">
+                            <span style={{ color: '#34d399' }}>{discountType === 'senior' ? 'Senior' : 'PWD'} Discount (20%)</span>
+                            <span style={{ color: '#34d399' }}>-₱{discountAmount.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center pt-2" style={{ borderTop: panelBorder }}>
+                          <span className="font-bold" style={{ color: '#f5f0e8' }}>Total</span>
+                          <span className="text-xl font-bold" style={{ color: gold }}>₱{finalTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      </div>
+
+                      <div className="mb-6">
+                        <label className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                          Amount Paid
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold" style={{ color: gold }}>₱</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={amountPaid}
+                            onChange={(e) => setAmountPaid(e.target.value)}
+                            placeholder={finalTotal.toFixed(2)}
+                            className="w-full pl-10 pr-4 py-3 rounded-xl text-lg font-bold"
+                            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#f5f0e8', outline: 'none' }}
+                          />
+                        </div>
+                        {amountPaid && parseFloat(amountPaid) >= finalTotal && (
+                          <div className="mt-2 flex justify-between text-sm">
+                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>Change</span>
+                            <span className="font-bold" style={{ color: '#34d399' }}>₱{changeAmount.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-3">
+                        <button onClick={() => setOrderStep(1)}
+                          className="flex-1 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+                          style={{ background: 'rgba(255,255,255,0.08)', color: '#f5f0e8', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          <FiArrowLeft size={14} /> Back
+                        </button>
+                        <button
+                          onClick={() => setOrderStep(3)}
+                          disabled={!selectedPaymentMethod || !amountPaid || parseFloat(amountPaid) < finalTotal}
+                          className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+                          style={{
+                            background: gold,
+                            color: '#000',
+                            cursor: (!selectedPaymentMethod || !amountPaid || parseFloat(amountPaid) < finalTotal) ? 'not-allowed' : 'pointer',
+                          }}>
+                          Review Order <FiArrowRight size={14} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[11px] uppercase tracking-wider font-semibold mb-1"
-                      style={{ color: 'rgba(255,255,255,0.4)' }}>Stock</label>
-                    <input type="number" min="0" value={productForm.stock}
-                      onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-lg text-sm" style={inputStyle} placeholder="0" />
+                )}
+
+                {/* ── STEP 3: Confirm ── */}
+                {orderStep === 3 && (
+                  <div className="flex-1 p-8 overflow-y-auto flex items-center justify-center">
+                    <div className="max-w-lg w-full">
+                      <div className="text-center mb-6">
+                        <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
+                          style={{ background: 'rgba(212,175,55,0.15)' }}>
+                          <FiCheck size={32} style={{ color: gold }} />
+                        </div>
+                        <h3 className="text-xl font-bold" style={{ color: '#f5f0e8' }}>Confirm Order</h3>
+                        <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Review everything before submitting</p>
+                      </div>
+
+                      <div className="p-5 rounded-xl mb-6" style={{ background: 'rgba(255,255,255,0.03)', border: panelBorder }}>
+                        <div className="mb-3 pb-3" style={{ borderBottom: panelBorder }}>
+                          <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Type</p>
+                          <p className="text-sm font-medium capitalize" style={{ color: '#f5f0e8' }}>{orderType}</p>
+                        </div>
+
+                        <div className="space-y-2 mb-3 pb-3" style={{ borderBottom: panelBorder }}>
+                          {cart.map((item) => (
+                            <div key={item.product_id} className="flex justify-between text-sm">
+                              <span style={{ color: 'rgba(255,255,255,0.6)' }}>{item.name} × {item.quantity}</span>
+                              <span style={{ color: '#f5f0e8' }}>₱{(item.unit_price * item.quantity).toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="space-y-2 mb-3 pb-3" style={{ borderBottom: panelBorder }}>
+                          <div className="flex justify-between text-sm">
+                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>Subtotal</span>
+                            <span style={{ color: '#f5f0e8' }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                          {discountType !== 'none' && (
+                            <div className="flex justify-between text-sm">
+                              <span style={{ color: '#34d399' }}>{discountType === 'senior' ? 'Senior' : 'PWD'} Discount (20%)</span>
+                              <span style={{ color: '#34d399' }}>-₱{discountAmount.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm font-bold">
+                            <span style={{ color: '#f5f0e8' }}>Total</span>
+                            <span style={{ color: gold }}>₱{finalTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>Payment Method</span>
+                            <span className="font-medium" style={{ color: '#f5f0e8' }}>
+                              {paymentMethods.find((m) => m.id === selectedPaymentMethod)?.name || '—'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>Amount Paid</span>
+                            <span className="font-medium" style={{ color: '#f5f0e8' }}>₱{parseFloat(amountPaid).toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>Change</span>
+                            <span className="font-bold" style={{ color: '#34d399' }}>₱{changeAmount.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <button onClick={() => setOrderStep(2)}
+                          className="flex-1 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+                          style={{ background: 'rgba(255,255,255,0.08)', color: '#f5f0e8', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          <FiArrowLeft size={14} /> Back
+                        </button>
+                        <button onClick={completeOrder} disabled={submitting}
+                          className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                          style={{ background: 'linear-gradient(135deg, #4ade80, #22c55e)', color: '#000' }}>
+                          {submitting ? 'Submitting…' : <><FiCheck size={14} /> Place Order</>}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Description */}
-                <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-semibold mb-1"
-                    style={{ color: 'rgba(255,255,255,0.4)' }}>Description</label>
-                  <textarea rows={3} value={productForm.description}
-                    onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-lg text-sm resize-none" style={inputStyle} placeholder="Optional description…" />
-                </div>
-              </div>
+                {/* ── STEP 4: Receipt ── */}
+                {orderStep === 4 && receiptData && (
+                  <div className="flex-1 p-8 overflow-y-auto flex items-center justify-center">
+                    <div className="max-w-md w-full">
+                      <div className="text-center mb-6">
+                        <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
+                          style={{ background: 'rgba(52,211,153,0.15)' }}>
+                          <FiCheckCircle size={32} style={{ color: '#34d399' }} />
+                        </div>
+                        <h3 className="text-xl font-bold" style={{ color: '#f5f0e8' }}>Order Complete!</h3>
+                        <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Order #{String(receiptData.receipt.order_id).padStart(4, '0')}</p>
+                      </div>
 
-              <div className="p-5 flex gap-3" style={{ borderTop: panelBorder }}>
-                <button onClick={() => setShowProductModal(false)}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition"
-                  style={{ background: 'rgba(255,255,255,0.08)', color: '#f5f0e8', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  Cancel
-                </button>
-                <button onClick={saveProduct} disabled={productSaving}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold transition disabled:opacity-50"
-                  style={{ background: `linear-gradient(135deg, ${gold}, #b38f2c)`, color: '#000' }}>
-                  {productSaving ? 'Saving…' : editingProduct ? 'Update Product' : 'Add Product'}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                      <div ref={receiptRef} className="p-6 rounded-xl mb-6" style={{ background: '#fff', color: '#000' }}>
+                        <div className="text-center mb-4 pb-3" style={{ borderBottom: '2px dashed #ccc' }}>
+                          <h4 className="text-lg font-bold">{receiptData.store.name}</h4>
+                          <p className="text-xs text-gray-500">{receiptData.store.address}</p>
+                          <p className="text-xs text-gray-500">{receiptData.store.phone}</p>
+                        </div>
 
-      {/* ═══════════════ CATEGORY MODAL ═══════════════ */}
-      <AnimatePresence>
-        {showCategoryModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}
-            onClick={() => setShowCategoryModal(false)}>
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md rounded-2xl overflow-hidden"
-              style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <div className="text-xs mb-3 space-y-0.5">
+                          <div className="flex justify-between"><span className="text-gray-500">Order #</span><span className="font-medium">{receiptData.receipt.order_id}</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">Date</span><span>{receiptData.receipt.date}</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">Cashier</span><span>{receiptData.receipt.cashier}</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">Customer</span><span>{receiptData.receipt.customer}</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">Type</span><span>{receiptData.receipt.order_type}</span></div>
+                        </div>
 
-              <div className="p-5 flex items-center justify-between" style={{ borderBottom: panelBorder }}>
-                <h2 className="text-lg font-bold" style={{ color: '#f5f0e8' }}>
-                  {editingCategory ? 'Edit Category' : 'Add New Category'}
-                </h2>
-                <button onClick={() => setShowCategoryModal(false)} className="p-2 rounded-lg hover:bg-white/10 transition" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                  <FiX size={20} />
-                </button>
-              </div>
+                        <div className="my-3" style={{ borderTop: '1px dashed #ccc' }} />
 
-              <div className="p-5 space-y-4">
-                <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-semibold mb-1"
-                    style={{ color: 'rgba(255,255,255,0.4)' }}>Category Name *</label>
-                  <input value={categoryForm.name} onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-lg text-sm" style={inputStyle} placeholder="e.g. Main Course" />
-                </div>
-                <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-semibold mb-1"
-                    style={{ color: 'rgba(255,255,255,0.4)' }}>Description</label>
-                  <textarea rows={2} value={categoryForm.description}
-                    onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-lg text-sm resize-none" style={inputStyle} placeholder="Optional…" />
-                </div>
-              </div>
+                        <div className="text-xs space-y-1 mb-3">
+                          <div className="flex justify-between font-bold text-gray-600">
+                            <span>Item</span>
+                            <span>Total</span>
+                          </div>
+                          {receiptData.items.map((item, i) => (
+                            <div key={i} className="flex justify-between">
+                              <span>{item.name}{item.variant ? ` (${item.variant})` : ''} × {item.quantity}</span>
+                              <span>₱{item.subtotal}</span>
+                            </div>
+                          ))}
+                        </div>
 
-              <div className="p-5 flex gap-3" style={{ borderTop: panelBorder }}>
-                <button onClick={() => setShowCategoryModal(false)}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition"
-                  style={{ background: 'rgba(255,255,255,0.08)', color: '#f5f0e8', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  Cancel
-                </button>
-                <button onClick={saveCategory} disabled={categorySaving}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold transition disabled:opacity-50"
-                  style={{ background: `linear-gradient(135deg, ${gold}, #b38f2c)`, color: '#000' }}>
-                  {categorySaving ? 'Saving…' : editingCategory ? 'Update Category' : 'Add Category'}
-                </button>
+                        <div className="my-3" style={{ borderTop: '1px dashed #ccc' }} />
+
+                        <div className="text-xs space-y-1">
+                          <div className="flex justify-between"><span>Subtotal</span><span>₱{receiptData.summary.subtotal}</span></div>
+                          {receiptData.summary.discount_type && receiptData.summary.discount_type !== 'none' && (
+                            <div className="flex justify-between" style={{ color: '#16a34a' }}>
+                              <span>{receiptData.summary.discount_type === 'senior' ? 'Senior' : 'PWD'} Discount (20%)</span>
+                              <span>-₱{receiptData.summary.discount_amount}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between font-bold text-sm pt-1" style={{ borderTop: '1px solid #eee' }}>
+                            <span>TOTAL</span>
+                            <span>₱{receiptData.summary.total}</span>
+                          </div>
+                          <div className="flex justify-between"><span>Paid ({receiptData.summary.payment_method})</span><span>₱{receiptData.summary.amount_paid}</span></div>
+                          <div className="flex justify-between font-bold"><span>Change</span><span>₱{receiptData.summary.change}</span></div>
+                        </div>
+
+                        <div className="my-3" style={{ borderTop: '2px dashed #ccc' }} />
+                        <p className="text-center text-xs text-gray-400">Thank you! Please come again!</p>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            const printContents = receiptRef.current.innerHTML;
+                            const win = window.open('', '', 'width=350,height=600');
+                            win.document.write(`
+                              <html>
+                              <head>
+                                <title>Receipt</title>
+                                <style>
+                                  body { font-family: 'Courier New', monospace; padding: 10px; font-size: 12px; }
+                                  .flex { display: flex; justify-content: space-between; }
+                                  .text-center { text-align: center; }
+                                  .font-bold { font-weight: bold; }
+                                  .text-lg { font-size: 16px; }
+                                  .text-sm { font-size: 13px; }
+                                  .text-xs { font-size: 11px; }
+                                  .mb-3 { margin-bottom: 8px; }
+                                  .mb-4 { margin-bottom: 12px; }
+                                  .pb-3 { padding-bottom: 8px; }
+                                  .pt-1 { padding-top: 4px; }
+                                  .my-3 { margin: 8px 0; }
+                                  .space-y-0\\.5 > * + * { margin-top: 2px; }
+                                  .space-y-1 > * + * { margin-top: 4px; }
+                                  .text-gray-400 { color: #9ca3af; }
+                                  .text-gray-500 { color: #6b7280; }
+                                  .text-gray-600 { color: #4b5563; }
+                                  .font-medium { font-weight: 500; }
+                                  @media print { body { margin: 0; } }
+                                </style>
+                              </head>
+                              <body>${printContents}</body>
+                              </html>
+                            `);
+                            win.document.close();
+                            win.focus();
+                            win.print();
+                            win.close();
+                          }}
+                          className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
+                          style={{ background: 'rgba(255,255,255,0.08)', color: '#f5f0e8', border: '1px solid rgba(255,255,255,0.1)' }}
+                        >
+                          <FiPrinter size={14} /> Print Receipt
+                        </button>
+                        <button onClick={resetOrderModal}
+                          className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
+                          style={{ background: `linear-gradient(135deg, ${gold}, #b38f2c)`, color: '#000' }}>
+                          Done
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>

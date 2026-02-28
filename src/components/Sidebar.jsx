@@ -10,6 +10,7 @@ import logo from '../assets/logo.jpg';
 
 const ownerLinks = [
   { to: '/', icon: FiGrid, label: 'Dashboard' },
+  { to: '/products-categories', icon: FiShoppingBag, label: 'Products & Categories' },
   { to: '/users', icon: FiUsers, label: 'Users' },
   { to: '/orders', icon: FiFileText, label: 'Orders' },
   { to: '/reports', icon: FiBarChart2, label: 'Reports' },
