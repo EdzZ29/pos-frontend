@@ -6,15 +6,23 @@ import {
   FiShoppingCart, FiFileText, FiDollarSign, FiClock,
   FiCheckCircle, FiPlus, FiArrowRight, FiX, FiMinus,
   FiTrash2, FiCheck, FiArrowLeft, FiPrinter, FiCreditCard,
-  FiPercent,
+  FiPercent, FiCalendar,
 } from 'react-icons/fi';
 
 export default function CashierDashboard() {
   const { user } = useAuth();
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const [stats, setStats] = useState({
     myOrders: 0, myPending: 0, myCompleted: 0, myRevenue: 0,
   });
   const [recentOrders, setRecentOrders] = useState([]);
+  const [cashierOrdersPage, setCashierOrdersPage] = useState(1);
   // Real data for ordering
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -231,17 +239,38 @@ export default function CashierDashboard() {
     ? products
     : products.filter((p) => p.category_id === parseInt(menuCategory));
 
+  /* pagination for recent orders */
+  const ORDERS_PER_PAGE = 8;
+  const paginatedCashierOrders = recentOrders.slice((cashierOrdersPage - 1) * ORDERS_PER_PAGE, cashierOrdersPage * ORDERS_PER_PAGE);
+  const totalCashierOrderPages = Math.max(1, Math.ceil(recentOrders.length / ORDERS_PER_PAGE));
+
   return (
     <div className="p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-        <h1 className="text-2xl font-bold" style={{ color: '#f5f0e8' }}>
-          Cashier Dashboard
-        </h1>
-        <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
-          Welcome back, {user?.name?.split(' ')[0] || 'Cashier'}. Here's your shift overview.
-        </p>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: '#f5f0e8' }}>
+            Cashier Dashboard
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            Welcome back, {user?.name?.split(' ')[0] || 'Cashier'}. Here's your shift overview.
+          </p>
+        </div>
+        <div className="text-right flex-shrink-0 ml-4">
+          <div className="flex items-center gap-2 justify-end mb-1">
+            <FiCalendar size={14} style={{ color: '#d4af37' }} />
+            <span className="text-sm font-semibold" style={{ color: '#f5f0e8' }}>
+              {currentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 justify-end">
+            <FiClock size={14} style={{ color: '#d4af37' }} />
+            <span className="text-lg font-bold tabular-nums" style={{ color: '#d4af37' }}>
+              {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          </div>
+        </div>
       </motion.div>
 
       {/* Take Order button — half width */}
@@ -283,6 +312,74 @@ export default function CashierDashboard() {
           value={`₱${(stats.myTotalAmount || 0).toLocaleString('en', { minimumFractionDigits: 2 })}`}
           color="#d4af37" />
       </div>
+
+      {/* ──────────── RECENT ORDERS ──────────── */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="rounded-xl overflow-hidden mb-8" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <h2 className="text-sm font-semibold" style={{ color: '#f5f0e8' }}>My Recent Orders</h2>
+          <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-md"
+            style={{ background: 'rgba(212,175,55,0.12)', color: '#d4af37' }}>
+            {recentOrders.length} total
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                {['Order #', 'Type', 'Total', 'Status', 'Date'].map((h) => (
+                  <th key={h} className="px-5 py-3 text-left text-[11px] uppercase tracking-wider font-semibold"
+                    style={{ color: 'rgba(255,255,255,0.35)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedCashierOrders.map((order) => (
+                <tr key={order.id} className="hover:bg-white/[0.02] transition"
+                  style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <td className="px-5 py-3 font-mono text-xs" style={{ color: '#d4af37' }}>#{String(order.id).padStart(4, '0')}</td>
+                  <td className="px-5 py-3">
+                    <span className="text-[10px] uppercase px-2 py-0.5 rounded-md font-semibold"
+                      style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>{order.order_type}</span>
+                  </td>
+                  <td className="px-5 py-3 font-semibold" style={{ color: '#f5f0e8' }}>
+                    ₱{parseFloat(order.total_amount).toLocaleString('en', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-5 py-3"><StatusBadge status={order.status} /></td>
+                  <td className="px-5 py-3 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    {new Date(order.created_at).toLocaleDateString()}
+                  </td>
+                </tr>
+              ))}
+              {recentOrders.length === 0 && (
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No orders yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {totalCashierOrderPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              Page {cashierOrdersPage} of {totalCashierOrderPages}
+            </span>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setCashierOrdersPage((p) => Math.max(1, p - 1))} disabled={cashierOrdersPage === 1}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
+                style={{ background: 'rgba(255,255,255,0.06)', color: '#f5f0e8' }}>
+                ← Prev
+              </button>
+              <span className="text-xs px-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                {cashierOrdersPage} / {totalCashierOrderPages}
+              </span>
+              <button onClick={() => setCashierOrdersPage((p) => Math.min(totalCashierOrderPages, p + 1))} disabled={cashierOrdersPage === totalCashierOrderPages}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
+                style={{ background: 'rgba(255,255,255,0.06)', color: '#f5f0e8' }}>
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+      </motion.div>
 
       {/* ──────────── ORDER MODAL ──────────── */}
       <AnimatePresence>

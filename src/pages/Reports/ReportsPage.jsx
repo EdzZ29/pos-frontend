@@ -1,12 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { orderService, paymentService } from '../../api';
 import { motion } from 'framer-motion';
 import {
   FiCalendar, FiDollarSign, FiFileText, FiTrendingUp,
-  FiShoppingBag, FiBarChart2,
+  FiShoppingBag, FiBarChart2, FiRefreshCw,
 } from 'react-icons/fi';
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   AreaChart, Area,
 } from 'recharts';
@@ -41,6 +41,13 @@ const customTooltipStyle = {
   padding: '8px 12px',
 };
 
+const inputStyle = {
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  color: '#f5f0e8',
+  outline: 'none',
+};
+
 /* ═════════════════════════════════════
    REPORTS PAGE
    ═════════════════════════════════════ */
@@ -48,24 +55,35 @@ export default function ReportsPage() {
   const [orders, setOrders] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState('daily'); // daily | weekly | monthly | yearly
+  const [period, setPeriod] = useState('daily'); // daily | weekly | monthly | yearly | specific
+  const [specificDate, setSpecificDate] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [breakdownPage, setBreakdownPage] = useState(1);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [o, p] = await Promise.all([orderService.getAll(), paymentService.getAll()]);
-        setOrders(o);
-        setPayments(p);
-      } catch (err) {
-        console.error('Failed to load reports data', err);
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const fetchData = useCallback(async () => {
+    try {
+      const [o, p] = await Promise.all([orderService.getAll(), paymentService.getAll()]);
+      setOrders(o);
+      setPayments(p);
+      setLastRefresh(new Date());
+    } catch (err) {
+      console.error('Failed to load reports data', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  // Initial fetch + auto-refresh every 30 seconds
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
   /* ══════ date helpers ══════ */
-  const now = new Date();
+  const now = useMemo(() => new Date(), [lastRefresh]);
 
   const isToday = (d) => {
     const dt = new Date(d);
@@ -80,30 +98,38 @@ export default function ReportsPage() {
     return dt >= startOfWeek && dt <= now;
   };
 
-  const isThisMonth = (d) => {
+  const isSelectedMonth = (d) => {
     const dt = new Date(d);
-    return dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear();
+    return dt.getMonth() === selectedMonth && dt.getFullYear() === selectedYear;
   };
 
-  const isThisYear = (d) => {
+  const isSelectedYear = (d) => {
     const dt = new Date(d);
-    return dt.getFullYear() === now.getFullYear();
+    return dt.getFullYear() === selectedYear;
+  };
+
+  const isOnSpecificDate = (d) => {
+    if (!specificDate) return false;
+    const dt = new Date(d);
+    const target = new Date(specificDate);
+    return dt.toDateString() === target.toDateString();
   };
 
   const matchesPeriod = (dateStr) => {
     if (!dateStr) return false;
+    if (period === 'specific') return isOnSpecificDate(dateStr);
     switch (period) {
       case 'daily':   return isToday(dateStr);
       case 'weekly':  return isThisWeek(dateStr);
-      case 'monthly': return isThisMonth(dateStr);
-      case 'yearly':  return isThisYear(dateStr);
+      case 'monthly': return isSelectedMonth(dateStr);
+      case 'yearly':  return isSelectedYear(dateStr);
       default: return true;
     }
   };
 
   /* ══════ filtered data ══════ */
-  const filteredOrders  = useMemo(() => orders.filter((o) => matchesPeriod(o.created_at)), [orders, period]);
-  const filteredPayments = useMemo(() => payments.filter((p) => matchesPeriod(p.created_at)), [payments, period]);
+  const filteredOrders  = useMemo(() => orders.filter((o) => matchesPeriod(o.created_at)), [orders, period, specificDate, selectedMonth, selectedYear, lastRefresh]);
+  const filteredPayments = useMemo(() => payments.filter((p) => matchesPeriod(p.created_at)), [payments, period, specificDate, selectedMonth, selectedYear, lastRefresh]);
 
   const completedOrders = filteredOrders.filter((o) => o.status === 'completed');
   const pendingOrders   = filteredOrders.filter((o) => o.status === 'pending');
@@ -123,44 +149,36 @@ export default function ReportsPage() {
 
   /* ══════ chart data builders ══════ */
 
-  /* Revenue over time (line / area chart) */
+  /* Revenue over time (area chart) — for specific date or daily, show hourly */
   const revenueOverTime = useMemo(() => {
     const map = {};
+    const useHourly = period === 'daily' || period === 'specific';
+
     completedOrders.forEach((o) => {
-      let key;
       const dt = new Date(o.created_at);
-      if (period === 'daily') {
-        key = dt.toLocaleTimeString([], { hour: '2-digit' });
+      let key, sortKey;
+      if (useHourly) {
+        const hour = dt.getHours();
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const h12 = hour % 12 || 12;
+        key = `${h12} ${ampm}`;
+        sortKey = hour;
       } else if (period === 'weekly') {
         key = dt.toLocaleDateString('en', { weekday: 'short' });
+        sortKey = dt.getDay();
       } else if (period === 'monthly') {
         key = `Day ${dt.getDate()}`;
+        sortKey = dt.getDate();
       } else {
         key = dt.toLocaleDateString('en', { month: 'short' });
+        sortKey = dt.getMonth();
       }
-      if (!map[key]) map[key] = { name: key, revenue: 0, orders: 0 };
+      if (!map[key]) map[key] = { name: key, revenue: 0, orders: 0, _sort: sortKey };
       map[key].revenue += parseFloat(o.total_amount || 0);
       map[key].orders += 1;
     });
 
-    // Sort for proper ordering
-    const arr = Object.values(map);
-    if (period === 'daily') {
-      // Sort by hour
-      return arr;
-    }
-    if (period === 'yearly') {
-      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      return arr.sort((a, b) => months.indexOf(a.name) - months.indexOf(b.name));
-    }
-    if (period === 'monthly') {
-      return arr.sort((a, b) => parseInt(a.name.replace('Day ', '')) - parseInt(b.name.replace('Day ', '')));
-    }
-    if (period === 'weekly') {
-      const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-      return arr.sort((a, b) => days.indexOf(a.name) - days.indexOf(b.name));
-    }
-    return arr;
+    return Object.values(map).sort((a, b) => a._sort - b._sort);
   }, [completedOrders, period]);
 
   /* Order status distribution (pie chart) */
@@ -171,6 +189,17 @@ export default function ReportsPage() {
     if (cancelledOrders.length > 0) data.push({ name: 'Cancelled', value: cancelledOrders.length, color: '#f87171' });
     return data;
   }, [completedOrders, pendingOrders, cancelledOrders]);
+
+  /* Payment methods breakdown (pie) */
+  const paymentMethodBreakdown = useMemo(() => {
+    const map = {};
+    filteredPayments.filter((p) => p.status === 'paid').forEach((p) => {
+      const name = p.method?.name || p.payment_method?.name || 'Unknown';
+      if (!map[name]) map[name] = { name, value: 0 };
+      map[name].value += parseFloat(p.amount_paid || 0);
+    });
+    return Object.values(map);
+  }, [filteredPayments]);
 
   /* Top selling products (bar chart) */
   const topProducts = useMemo(() => {
@@ -186,24 +215,14 @@ export default function ReportsPage() {
     return Object.values(map).sort((a, b) => b.qty - a.qty).slice(0, 8);
   }, [completedOrders]);
 
-  /* Payment methods breakdown (pie) */
-  const paymentMethodBreakdown = useMemo(() => {
-    const map = {};
-    filteredPayments.filter((p) => p.status === 'paid').forEach((p) => {
-      const name = p.method?.name || p.payment_method?.name || 'Unknown';
-      if (!map[name]) map[name] = { name, value: 0 };
-      map[name].value += parseFloat(p.amount_paid || 0);
-    });
-    return Object.values(map);
-  }, [filteredPayments]);
-
-  /* Daily breakdown table (when period=daily, show hourly; else show by-day rows) */
+  /* Hourly / daily breakdown table */
   const dailyBreakdown = useMemo(() => {
     const map = {};
+    const useHourly = period === 'daily' || period === 'specific';
     filteredOrders.forEach((o) => {
       const dt = new Date(o.created_at);
       let key;
-      if (period === 'daily') {
+      if (useHourly) {
         key = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       } else {
         key = dt.toLocaleDateString();
@@ -218,27 +237,70 @@ export default function ReportsPage() {
     return Object.values(map);
   }, [filteredOrders, period]);
 
-  const periodLabels = { daily: "Today's", weekly: "This Week's", monthly: "This Month's", yearly: "This Year's" };
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  const availableYears = useMemo(() => {
+    const years = new Set();
+    orders.forEach((o) => { if (o.created_at) years.add(new Date(o.created_at).getFullYear()); });
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [orders]);
+
+  const BREAKDOWN_PER_PAGE = 10;
+  const totalBreakdownPages = Math.max(1, Math.ceil(dailyBreakdown.length / BREAKDOWN_PER_PAGE));
+  const paginatedBreakdown = dailyBreakdown.slice((breakdownPage - 1) * BREAKDOWN_PER_PAGE, breakdownPage * BREAKDOWN_PER_PAGE);
+
+  useEffect(() => { setBreakdownPage(1); }, [period, selectedMonth, selectedYear, specificDate]);
+
+  const periodLabels = {
+    daily: "Today's",
+    weekly: "This Week's",
+    monthly: `${monthNames[selectedMonth]} ${selectedYear}`,
+    yearly: `Year ${selectedYear}`,
+  };
+
+  const activePeriodLabel = period === 'specific'
+    ? (specificDate
+        ? new Date(specificDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+        : 'Select a Date')
+    : periodLabels[period];
+
+  const breakdownLabel = (period === 'daily' || period === 'specific') ? 'Hourly' : 'Daily';
 
   return (
     <div className="p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: '#f5f0e8' }}>Reports</h1>
-        <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
-          Sales analytics, performance metrics, and business insights.
-        </p>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: '#f5f0e8' }}>Reports</h1>
+          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            Sales analytics, performance metrics, and business insights.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            Last updated: {lastRefresh.toLocaleTimeString()}
+          </span>
+          <button
+            onClick={fetchData}
+            className="p-2 rounded-lg transition hover:bg-white/10"
+            style={{ color: gold, border: '1px solid rgba(212,175,55,0.2)' }}
+            title="Refresh data"
+          >
+            <FiRefreshCw size={14} />
+          </button>
+        </div>
       </motion.div>
 
-      {/* Period selector */}
+      {/* Period selector + Specific date picker */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         className="flex items-center gap-2 mb-6 flex-wrap">
         <FiCalendar size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
-        {['daily', 'weekly', 'monthly', 'yearly'].map((p) => (
+        {['daily', 'weekly'].map((p) => (
           <button
             key={p}
-            onClick={() => setPeriod(p)}
+            onClick={() => { setPeriod(p); setSpecificDate(''); }}
             className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all"
             style={{
               background: period === p ? gold : 'rgba(255,255,255,0.04)',
@@ -249,6 +311,76 @@ export default function ReportsPage() {
             {p}
           </button>
         ))}
+
+        {/* Monthly with dropdown */}
+        <button
+          onClick={() => { setPeriod('monthly'); setSpecificDate(''); }}
+          className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all"
+          style={{
+            background: period === 'monthly' ? gold : 'rgba(255,255,255,0.04)',
+            color: period === 'monthly' ? '#000' : 'rgba(255,255,255,0.5)',
+            border: period === 'monthly' ? 'none' : '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
+          monthly
+        </button>
+        {period === 'monthly' && (
+          <div className="flex items-center gap-1">
+            <select value={selectedMonth} onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+              className="px-2 py-1.5 rounded-lg text-xs cursor-pointer" style={{ ...inputStyle, colorScheme: 'dark' }}>
+              {monthNames.map((m, i) => <option key={i} value={i} style={{ color: '#000', background: '#fff' }}>{m}</option>)}
+            </select>
+            <select value={selectedYear} onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="px-2 py-1.5 rounded-lg text-xs cursor-pointer" style={{ ...inputStyle, colorScheme: 'dark' }}>
+              {availableYears.map((y) => <option key={y} value={y} style={{ color: '#000', background: '#fff' }}>{y}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* Yearly with dropdown */}
+        <button
+          onClick={() => { setPeriod('yearly'); setSpecificDate(''); }}
+          className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all"
+          style={{
+            background: period === 'yearly' ? gold : 'rgba(255,255,255,0.04)',
+            color: period === 'yearly' ? '#000' : 'rgba(255,255,255,0.5)',
+            border: period === 'yearly' ? 'none' : '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
+          yearly
+        </button>
+        {period === 'yearly' && (
+          <select value={selectedYear} onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+            className="px-2 py-1.5 rounded-lg text-xs cursor-pointer" style={{ ...inputStyle, colorScheme: 'dark' }}>
+            {availableYears.map((y) => <option key={y} value={y} style={{ color: '#000', background: '#fff' }}>{y}</option>)}
+          </select>
+        )}
+
+        {/* Separator */}
+        <div className="w-px h-6 mx-2" style={{ background: 'rgba(255,255,255,0.1)' }} />
+
+        {/* Specific date picker */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            Specific Date
+          </span>
+          <input
+            type="date"
+            value={specificDate}
+            onChange={(e) => { setSpecificDate(e.target.value); if (e.target.value) setPeriod('specific'); }}
+            className="px-3 py-1.5 rounded-lg text-xs"
+            style={inputStyle}
+          />
+          {period === 'specific' && (
+            <button
+              onClick={() => { setSpecificDate(''); setPeriod('daily'); }}
+              className="px-3 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition hover:bg-red-500/20"
+              style={{ color: '#f87171', border: '1px solid rgba(248,113,113,0.2)' }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </motion.div>
 
       {loading ? (
@@ -257,14 +389,12 @@ export default function ReportsPage() {
         <>
           {/* ─── Stat cards ─── */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
             <StatCard icon={<FiFileText size={20} />} label="Total Orders" value={filteredOrders.length} color="#60a5fa" />
             <StatCard icon={<FiDollarSign size={20} />} label="Revenue" value={fmt(totalRevenue)} color={gold} />
             <StatCard icon={<FiTrendingUp size={20} />} label="Sales" value={fmt(totalSales)} color="#4ade80" />
             <StatCard icon={<FiShoppingBag size={20} />} label="Items Sold" value={totalProductsSold} color="#a78bfa" />
             <StatCard icon={<FiBarChart2 size={20} />} label="Avg Order" value={fmt(avgOrderValue)} color="#f472b6" />
-            <StatCard icon={<FiFileText size={20} />} label="Completed" value={completedOrders.length}
-              color="#34d399" sub={`${pendingOrders.length} pending · ${cancelledOrders.length} cancelled`} />
           </motion.div>
 
           {/* ─── Charts Row 1: Revenue + Order Status ─── */}
@@ -273,7 +403,7 @@ export default function ReportsPage() {
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               className="lg:col-span-2 rounded-xl p-5" style={{ background: panelBg, border: panelBorder }}>
               <h3 className="text-sm font-semibold mb-4" style={{ color: '#f5f0e8' }}>
-                {periodLabels[period]} Revenue & Orders
+                {activePeriodLabel} Revenue & Orders
               </h3>
               {revenueOverTime.length === 0 ? (
                 <div className="flex items-center justify-center h-64 text-sm" style={{ color: 'rgba(255,255,255,0.25)' }}>
@@ -391,12 +521,12 @@ export default function ReportsPage() {
             </motion.div>
           </div>
 
-          {/* ─── Daily / Period Breakdown Table ─── */}
+          {/* ─── Period Breakdown Table ─── */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             className="rounded-xl overflow-hidden mb-6" style={{ background: panelBg, border: panelBorder }}>
             <div className="px-5 py-4" style={{ borderBottom: panelBorder }}>
               <h3 className="text-sm font-semibold" style={{ color: '#f5f0e8' }}>
-                {period === 'daily' ? 'Hourly' : 'Daily'} Breakdown
+                {breakdownLabel} Breakdown
                 <span className="ml-2 text-[10px] uppercase tracking-wider px-2 py-1 rounded-md"
                   style={{ background: 'rgba(212,175,55,0.12)', color: gold }}>
                   {dailyBreakdown.length} entries
@@ -407,7 +537,7 @@ export default function ReportsPage() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0" style={{ background: '#0d0d0d' }}>
                   <tr style={{ borderBottom: panelBorder }}>
-                    {[period === 'daily' ? 'Time' : 'Date', 'Orders', 'Items Sold', 'Revenue'].map((h) => (
+                    {[(period === 'daily' || period === 'specific') ? 'Time' : 'Date', 'Orders', 'Items Sold', 'Revenue'].map((h) => (
                       <th key={h} className="px-5 py-3 text-left text-[11px] uppercase tracking-wider font-semibold"
                         style={{ color: 'rgba(255,255,255,0.35)' }}>{h}</th>
                     ))}
@@ -421,7 +551,7 @@ export default function ReportsPage() {
                       </td>
                     </tr>
                   ) : (
-                    dailyBreakdown.map((row, i) => (
+                    paginatedBreakdown.map((row, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
                         className="hover:bg-white/[0.02] transition">
                         <td className="px-5 py-3 text-xs font-medium" style={{ color: '#f5f0e8' }}>{row.time}</td>
@@ -446,6 +576,28 @@ export default function ReportsPage() {
                 </tbody>
               </table>
             </div>
+            {totalBreakdownPages > 1 && (
+              <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: panelBorder }}>
+                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  Page {breakdownPage} of {totalBreakdownPages}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setBreakdownPage((p) => Math.max(1, p - 1))} disabled={breakdownPage === 1}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
+                    style={{ background: 'rgba(255,255,255,0.06)', color: '#f5f0e8' }}>
+                    ← Prev
+                  </button>
+                  <span className="text-xs px-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                    {breakdownPage} / {totalBreakdownPages}
+                  </span>
+                  <button onClick={() => setBreakdownPage((p) => Math.min(totalBreakdownPages, p + 1))} disabled={breakdownPage === totalBreakdownPages}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
+                    style={{ background: 'rgba(255,255,255,0.06)', color: '#f5f0e8' }}>
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
           </motion.div>
         </>
       )}

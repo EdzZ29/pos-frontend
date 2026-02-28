@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiGrid, FiUsers, FiShoppingBag, FiLayers, FiFileText,
   FiCreditCard, FiLogOut, FiShield, FiShoppingCart, FiBarChart2,
@@ -39,6 +41,7 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const role = user?.role?.slug;
   const links = getLinks(role);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -46,6 +49,7 @@ export default function Sidebar() {
   };
 
   return (
+    <>
     <aside className="fixed top-0 left-0 h-screen w-64 flex flex-col z-30"
       style={{
         background: 'linear-gradient(180deg, #111111 0%, #0a0a0a 100%)',
@@ -105,14 +109,76 @@ export default function Sidebar() {
           </div>
         </div>
         <button
-          onClick={handleLogout}
+          onClick={() => setShowLogoutModal(true)}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 hover:bg-red-500/20"
           style={{ color: '#f87171', border: '1px solid rgba(248,113,113,0.2)' }}
         >
           <FiLogOut size={13} />
-          Sign Out
+          Log Out
         </button>
       </div>
     </aside>
+
+    {/* Logout Confirmation Modal */}
+    <AnimatePresence>
+      {showLogoutModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowLogoutModal(false)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="rounded-2xl p-6 w-full max-w-sm mx-4 text-center"
+            style={{
+              background: 'linear-gradient(145deg, #1a1a1a, #111)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
+              style={{ background: 'rgba(248,113,113,0.12)' }}>
+              <FiLogOut size={24} style={{ color: '#f87171' }} />
+            </div>
+            <h3 className="text-lg font-bold mb-2" style={{ color: '#f5f0e8' }}>
+              Log Out
+            </h3>
+            <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              Are you sure you want to logout?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 hover:bg-white/10"
+                style={{
+                  color: 'rgba(255,255,255,0.7)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                }}
+              >
+                No
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 hover:opacity-90"
+                style={{
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                  color: '#fff',
+                }}
+              >
+                Yes
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }
