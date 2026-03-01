@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiGrid, FiUsers, FiShoppingBag, FiLayers, FiFileText,
   FiCreditCard, FiLogOut, FiShield, FiShoppingCart, FiBarChart2,
+  FiClock, FiCamera, FiSettings,
 } from 'react-icons/fi';
-import logo from '../assets/logo.jpg';
+import defaultLogo from '../assets/logo.jpg';
 
 const ownerLinks = [
   { to: '/', icon: FiGrid, label: 'Dashboard' },
@@ -14,6 +16,9 @@ const ownerLinks = [
   { to: '/users', icon: FiUsers, label: 'Users' },
   { to: '/orders', icon: FiFileText, label: 'Orders' },
   { to: '/reports', icon: FiBarChart2, label: 'Reports' },
+  { to: '/logs', icon: FiClock, label: 'Logs' },
+  { to: '/attendance', icon: FiCamera, label: 'Attendance' },
+  { to: '/settings', icon: FiSettings, label: 'Settings' },
 ];
 
 const managerLinks = [
@@ -39,10 +44,12 @@ function getLinks(role) {
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
+  const { gold, goldDark, goldRgb, systemName, logoUrl, sidebarBg, sidebarWidth, headingFont, t, isDark } = useSettings();
   const navigate = useNavigate();
   const role = user?.role?.slug;
   const links = getLinks(role);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const logoSrc = logoUrl || defaultLogo;
 
   const handleLogout = async () => {
     await logout();
@@ -51,21 +58,22 @@ export default function Sidebar() {
 
   return (
     <>
-    <aside className="fixed top-0 left-0 h-screen w-64 flex flex-col z-30"
+    <aside className="fixed top-0 left-0 h-screen flex flex-col z-30"
       style={{
-        background: 'linear-gradient(180deg, #111111 0%, #0a0a0a 100%)',
-        borderRight: '1px solid rgba(255,255,255,0.06)',
+        width: `${sidebarWidth}px`,
+        background: sidebarBg,
+        borderRight: `1px solid ${t.sidebarBorder}`,
       }}
     >
       {/* Brand */}
-      <div className="flex items-center gap-3 px-5 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <img src={logo} alt="Kaon Time" className="w-10 h-10 rounded-full object-cover"
-          style={{ border: '2px solid #d4af37' }} />
+      <div className="flex items-center gap-3 px-5 py-5" style={{ borderBottom: `1px solid ${t.sidebarBorder}` }}>
+        <img src={logoSrc} alt={systemName} className="w-10 h-10 rounded-full object-cover"
+          style={{ border: `2px solid ${gold}` }} />
         <div>
-          <h1 className="text-sm font-bold" style={{ color: '#f5f0e8', fontFamily: "'Playfair Display', serif" }}>
-            Kaon Time
+          <h1 className="text-sm font-bold" style={{ color: '#f5f0e8', fontFamily: headingFont }}>
+            {systemName}
           </h1>
-          <span className="text-[10px] uppercase tracking-widest" style={{ color: '#d4af37' }}>
+          <span className="text-[10px] uppercase tracking-widest" style={{ color: gold }}>
             {role || 'POS'}
           </span>
         </div>
@@ -82,12 +90,12 @@ export default function Sidebar() {
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                 isActive
                   ? 'text-black'
-                  : 'hover:bg-white/5'
+                  : isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'
               }`
             }
             style={({ isActive }) =>
               isActive
-                ? { background: 'linear-gradient(135deg, #d4af37, #a8862a)', color: '#000' }
+                ? { background: `linear-gradient(135deg, ${gold}, ${goldDark})`, color: '#000' }
                 : { color: 'rgba(255,255,255,0.55)' }
             }
           >
@@ -98,10 +106,10 @@ export default function Sidebar() {
       </nav>
 
       {/* User & Logout */}
-      <div className="px-4 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="px-4 py-4" style={{ borderTop: `1px solid ${t.sidebarBorder}` }}>
         <div className="flex items-center gap-3 mb-3">
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
-            style={{ background: 'rgba(212,175,55,0.15)', color: '#d4af37' }}>
+            style={{ background: `rgba(${goldRgb},0.15)`, color: gold }}>
             {user?.name?.charAt(0)?.toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -128,7 +136,7 @@ export default function Sidebar() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          style={{ background: t.modalOverlay, backdropFilter: 'blur(4px)' }}
           onClick={() => setShowLogoutModal(false)}
         >
           <motion.div
@@ -138,9 +146,9 @@ export default function Sidebar() {
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="rounded-2xl p-6 w-full max-w-sm mx-4 text-center"
             style={{
-              background: 'linear-gradient(145deg, #1a1a1a, #111)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+              background: t.modalBg,
+              border: `1px solid ${t.modalBorder}`,
+              boxShadow: t.shadow,
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -148,10 +156,10 @@ export default function Sidebar() {
               style={{ background: 'rgba(248,113,113,0.12)' }}>
               <FiLogOut size={24} style={{ color: '#f87171' }} />
             </div>
-            <h3 className="text-lg font-bold mb-2" style={{ color: '#f5f0e8' }}>
+            <h3 className="text-lg font-bold mb-2" style={{ color: t.textPrimary }}>
               Log Out
             </h3>
-            <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            <p className="text-sm mb-6" style={{ color: t.textSecondary }}>
               Are you sure you want to logout?
             </p>
             <div className="flex gap-3">
@@ -159,8 +167,8 @@ export default function Sidebar() {
                 onClick={() => setShowLogoutModal(false)}
                 className="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 hover:bg-white/10"
                 style={{
-                  color: 'rgba(255,255,255,0.7)',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: t.textSecondary,
+                  border: `1px solid ${t.divider}`,
                 }}
               >
                 No

@@ -8,6 +8,10 @@ import OrdersPage from './pages/Orders/OrdersPage';
 import UsersPage from './pages/Users/UsersPage';
 import ReportsPage from './pages/Reports/ReportsPage';
 import ProductsCategoriesPage from './pages/Products/ProductsCategoriesPage';
+import LogsPage from './pages/Logs/LogsPage';
+import AttendancePage from './pages/Attendance/AttendancePage';
+import SettingsPage from './pages/Settings/SettingsPage';
+import PublicQueuePage from './pages/Queue/PublicQueuePage';
 
 function App() {
   const { isAuthenticated } = useAuth();
@@ -19,6 +23,7 @@ function App() {
         path="/login"
         element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
       />
+      <Route path="/queue" element={<PublicQueuePage />} />
 
       {/* Protected routes with sidebar layout */}
       <Route
@@ -39,6 +44,9 @@ function App() {
         <Route path="/payments" element={<Placeholder title="Payments" />} />
         <Route path="/roles" element={<Placeholder title="Roles" />} />
         <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/logs" element={<LogsPage />} />
+        <Route path="/attendance" element={<AttendancePage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/pos" element={<Placeholder title="New Order (POS)" />} />
       </Route>
 

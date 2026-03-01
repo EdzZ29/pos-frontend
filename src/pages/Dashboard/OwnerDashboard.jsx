@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import { orderService, productService, categoryService, userService, paymentService } from '../../api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -10,18 +11,7 @@ import {
   FiArrowLeft, FiPrinter, FiCreditCard, FiPercent,
 } from 'react-icons/fi';
 
-/* ─── tiny helpers ─── */
-const gold = '#d4af37';
-const panelBg = 'rgba(255,255,255,0.03)';
-const panelBorder = '1px solid rgba(255,255,255,0.06)';
-const inputStyle = {
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  color: '#f5f0e8',
-  outline: 'none',
-};
-
-const StatCard = ({ icon, label, value, color }) => (
+const StatCard = ({ icon, label, value, color, t, panelBg, panelBorder }) => (
   <motion.div
     key={label}
     initial={{ opacity: 0, y: 20 }}
@@ -35,8 +25,8 @@ const StatCard = ({ icon, label, value, color }) => (
       {icon}
     </div>
     <div>
-      <p className="text-[11px] uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</p>
-      <p className="text-xl font-bold mt-0.5" style={{ color: '#f5f0e8' }}>{value}</p>
+      <p className="text-[11px] uppercase tracking-wider" style={{ color: t.textMuted }}>{label}</p>
+      <p className="text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{value}</p>
     </div>
   </motion.div>
 );
@@ -44,6 +34,7 @@ const StatCard = ({ icon, label, value, color }) => (
 /* ─────────────────── MAIN COMPONENT ─────────────────── */
 export default function OwnerDashboard() {
   const { user } = useAuth();
+  const { gold, goldDark, goldRgb, isDark, t, panelBg, panelBorder, inputStyle } = useSettings();
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -58,6 +49,7 @@ export default function OwnerDashboard() {
   const [allOrders, setAllOrders] = useState([]);
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [orderSearch, setOrderSearch] = useState('');
+  const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [stats, setStats] = useState({
     products: 0, orders: 0, users: 0, categories: 0,
     revenue: 0, totalSales: 0, pendingOrders: 0, completedOrders: 0, cancelledOrders: 0,
@@ -229,7 +221,7 @@ export default function OwnerDashboard() {
       setStats((prev) => ({
         ...prev,
         orders: prev.orders + 1,
-        completedOrders: prev.completedOrders + 1,
+        pendingOrders: prev.pendingOrders + 1,
         revenue: prev.revenue + parseFloat(amountPaid),
         totalSales: prev.totalSales + finalTotal,
       }));
@@ -265,26 +257,40 @@ export default function OwnerDashboard() {
   const paginatedOrders = recentOrders.slice((ordersPage - 1) * ITEMS_PER_PAGE, ordersPage * ITEMS_PER_PAGE);
   const totalOrderPages = Math.max(1, Math.ceil(recentOrders.length / ITEMS_PER_PAGE));
 
+  const handleOrderStatus = async (orderId, status) => {
+    if (updatingOrderId) return;
+    setUpdatingOrderId(orderId);
+    try {
+      await orderService.update(orderId, { status });
+      await fetchAll();
+    } catch (err) {
+      console.error('Failed to update order status', err);
+      alert(err.response?.data?.message || 'Failed to update order status');
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+
   return (
     <div className="p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
       {/* Page header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: '#f5f0e8' }}>Owner Dashboard</h1>
-          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <h1 className="text-2xl font-bold" style={{ color: t.textPrimary }}>Owner Dashboard</h1>
+          <p className="text-sm mt-1" style={{ color: t.textMuted }}>
             Welcome back, {user?.name}. Here's your business overview.
           </p>
         </div>
         <div className="text-right flex-shrink-0 ml-4">
           <div className="flex items-center gap-2 justify-end mb-1">
-            <FiCalendar size={14} style={{ color: '#d4af37' }} />
-            <span className="text-sm font-semibold" style={{ color: '#f5f0e8' }}>
+            <FiCalendar size={14} style={{ color: gold }} />
+            <span className="text-sm font-semibold" style={{ color: t.textPrimary }}>
               {currentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </span>
           </div>
           <div className="flex items-center gap-2 justify-end">
-            <FiClock size={14} style={{ color: '#d4af37' }} />
-            <span className="text-lg font-bold tabular-nums" style={{ color: '#d4af37' }}>
+            <FiClock size={14} style={{ color: gold }} />
+            <span className="text-lg font-bold tabular-nums" style={{ color: gold }}>
               {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </span>
           </div>
@@ -292,109 +298,143 @@ export default function OwnerDashboard() {
       </motion.div>
 
       {/* Take New Order button */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-            className="mb-8"
-          >
-            <button
-              onClick={openOrderModal}
-              className="w-full sm:w-1/2 py-5 px-6 rounded-2xl flex items-center justify-between group transition-all duration-300"
-              style={{
-                background: 'linear-gradient(135deg, #d4af37, #b38f2c)',
-                boxShadow: '0 8px 20px rgba(212,175,55,0.3)',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 12px 28px rgba(212,175,55,0.45)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 8px 20px rgba(212,175,55,0.3)'; e.currentTarget.style.transform = 'translateY(0)'; }}
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                  <FiPlus size={24} className="text-white" />
-                </div>
-                <div className="text-left">
-                  <span className="text-xl font-bold block text-white">Take New Order</span>
-                  <span className="text-white/70 text-sm">Start a new transaction</span>
-                </div>
-              </div>
-              <FiArrowRight size={24} className="text-white group-hover:translate-x-1 transition-transform" />
-            </button>
-          </motion.div>
-
-          {/* Stat card */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <StatCard icon={<FiDollarSign size={20} />} label="Total Revenue"
-              value={`₱${stats.revenue.toLocaleString('en', { minimumFractionDigits: 2 })}`} color={gold} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="mb-8"
+      >
+        <button
+          onClick={openOrderModal}
+          className="w-full sm:w-1/2 py-5 px-6 rounded-2xl flex items-center justify-between group transition-all duration-300"
+          style={{
+            background: `linear-gradient(135deg, ${gold}, ${goldDark})`,
+            boxShadow: `0 8px 20px rgba(${goldRgb},0.3)`,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 12px 28px rgba(${goldRgb},0.45)`; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 8px 20px rgba(${goldRgb},0.3)`; e.currentTarget.style.transform = 'translateY(0)'; }}
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+              <FiPlus size={24} className="text-white" />
+            </div>
+            <div className="text-left">
+              <span className="text-xl font-bold block text-white">Take New Order</span>
+              <span className="text-white/70 text-sm">Start a new transaction</span>
+            </div>
           </div>
+          <FiArrowRight size={24} className="text-white group-hover:translate-x-1 transition-transform" />
+        </button>
+      </motion.div>
 
-          {/* Recent orders table */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="rounded-xl overflow-hidden" style={{ background: panelBg, border: panelBorder }}>
-            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: panelBorder }}>
-              <h2 className="text-sm font-semibold" style={{ color: '#f5f0e8' }}>Recent Orders</h2>
-              <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-md"
-                style={{ background: 'rgba(212,175,55,0.12)', color: gold }}>
-                {recentOrders.length} total
-              </span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr style={{ borderBottom: panelBorder }}>
-                    {['Order #', 'Customer', 'Type', 'Total', 'Status', 'Date'].map((h) => (
-                      <th key={h} className="px-5 py-3 text-left text-[11px] uppercase tracking-wider font-semibold"
-                        style={{ color: 'rgba(255,255,255,0.35)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedOrders.map((order) => (
-                    <tr key={order.id} className="hover:bg-white/[0.02] transition"
-                      style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <td className="px-5 py-3 font-mono text-xs" style={{ color: gold }}>#{String(order.id).padStart(4, '0')}</td>
-                      <td className="px-5 py-3" style={{ color: '#f5f0e8' }}>{order.customer_name || 'Walk-in'}</td>
-                      <td className="px-5 py-3">
-                        <span className="text-[10px] uppercase px-2 py-0.5 rounded-md font-semibold"
-                          style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>{order.order_type}</span>
-                      </td>
-                      <td className="px-5 py-3 font-semibold" style={{ color: '#f5f0e8' }}>
-                        ₱{parseFloat(order.total_amount).toLocaleString('en', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-5 py-3"><StatusBadge status={order.status} /></td>
-                      <td className="px-5 py-3 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                        {new Date(order.created_at).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                  {recentOrders.length === 0 && (
-                    <tr><td colSpan={6} className="px-5 py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No orders yet.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {totalOrderPages > 1 && (
-              <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: panelBorder }}>
-                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                  Page {ordersPage} of {totalOrderPages} ({recentOrders.length} orders)
-                </span>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setOrdersPage((p) => Math.max(1, p - 1))} disabled={ordersPage === 1}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
-                    style={{ background: 'rgba(255,255,255,0.06)', color: '#f5f0e8' }}>
-                    ← Prev
-                  </button>
-                  <span className="text-xs px-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                    {ordersPage} / {totalOrderPages}
-                  </span>
-                  <button onClick={() => setOrdersPage((p) => Math.min(totalOrderPages, p + 1))} disabled={ordersPage === totalOrderPages}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
-                    style={{ background: 'rgba(255,255,255,0.06)', color: '#f5f0e8' }}>
-                    Next →
-                  </button>
+      {/* Stat card */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <StatCard icon={<FiDollarSign size={20} />} label="Total Revenue"
+          value={`₱${stats.revenue.toLocaleString('en', { minimumFractionDigits: 2 })}`} color={gold} t={t} panelBg={panelBg} panelBorder={panelBorder} />
+      </div>
+
+      {/* Recent orders cards */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="rounded-xl overflow-hidden" style={{ background: panelBg, border: panelBorder }}>
+        <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: panelBorder }}>
+          <h2 className="text-sm font-semibold" style={{ color: t.textPrimary }}>Recent Orders</h2>
+          <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-md"
+            style={{ background: `rgba(${goldRgb},0.12)`, color: gold }}>
+            {recentOrders.length} total
+          </span>
+        </div>
+        <div className="p-5 space-y-3">
+          {paginatedOrders.map((order) => (
+            <div key={order.id} className="rounded-xl p-4"
+              style={{ background: t.cardBg, border: `1px solid ${t.divider}` }}>
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider" style={{ color: t.textMuted }}>Order #</p>
+                  <p className="text-xl font-bold" style={{ color: gold }}>#{String(order.id).padStart(4, '0')}</p>
+                </div>
+                <StatusBadge status={order.status} />
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider" style={{ color: t.textFaint }}>Customer</p>
+                  <p className="text-sm font-medium" style={{ color: t.textPrimary }}>{order.customer_name || 'Walk-in'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider" style={{ color: t.textFaint }}>Type</p>
+                  <p className="text-sm capitalize" style={{ color: t.textPrimary }}>{order.order_type}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider" style={{ color: t.textFaint }}>Total</p>
+                  <p className="text-sm font-semibold" style={{ color: t.textPrimary }}>
+                    ₱{parseFloat(order.total_amount).toLocaleString('en', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider" style={{ color: t.textFaint }}>Date</p>
+                  <p className="text-sm" style={{ color: t.textPrimary }}>{new Date(order.created_at).toLocaleDateString()}</p>
                 </div>
               </div>
-            )}
-          </motion.div>
+
+              {(order.status === 'pending' || order.status === 'preparing') ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleOrderStatus(order.id, 'completed')}
+                    disabled={updatingOrderId === order.id}
+                    className="px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
+                    style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}>
+                    <FiCheckCircle size={13} /> Complete Order
+                  </button>
+                  <button
+                    onClick={() => handleOrderStatus(order.id, 'cancelled')}
+                    disabled={updatingOrderId === order.id}
+                    className="px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
+                    style={{ background: 'rgba(248,113,113,0.15)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)' }}>
+                    <FiXCircle size={13} /> Cancel Order
+                  </button>
+                </div>
+              ) : order.status === 'completed' ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleOrderStatus(order.id, 'served')}
+                    disabled={updatingOrderId === order.id}
+                    className="px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
+                    style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}>
+                    <FiCheckCircle size={13} /> Confirm Served
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs font-medium" style={{ color: t.textMuted }}>Order finalized</p>
+              )}
+            </div>
+          ))}
+          {recentOrders.length === 0 && (
+            <div className="py-8 text-center text-sm" style={{ color: t.textFaint }}>No orders yet.</div>
+          )}
+        </div>
+        {totalOrderPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: panelBorder }}>
+            <span className="text-xs" style={{ color: t.textMuted }}>
+              Page {ordersPage} of {totalOrderPages} ({recentOrders.length} orders)
+            </span>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setOrdersPage((p) => Math.max(1, p - 1))} disabled={ordersPage === 1}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
+                style={{ background: t.divider, color: t.textPrimary }}>
+                ← Prev
+              </button>
+              <span className="text-xs px-2" style={{ color: t.textSecondary }}>
+                {ordersPage} / {totalOrderPages}
+              </span>
+              <button onClick={() => setOrdersPage((p) => Math.min(totalOrderPages, p + 1))} disabled={ordersPage === totalOrderPages}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
+                style={{ background: t.divider, color: t.textPrimary }}>
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+      </motion.div>
 
       {/* ═══════════════ ORDER MODAL ═══════════════ */}
       <AnimatePresence>
@@ -404,7 +444,7 @@ export default function OwnerDashboard() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}
+            style={{ background: t.modalOverlay, backdropFilter: 'blur(8px)' }}
             onClick={() => resetOrderModal()}
           >
             <motion.div
@@ -413,32 +453,32 @@ export default function OwnerDashboard() {
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-6xl overflow-hidden rounded-2xl flex flex-col"
-              style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.1)', height: '85vh', fontFamily: "'Inria Sans', sans-serif" }}
+              style={{ background: t.modalBg, border: `1px solid ${t.inputBorder}`, height: '85vh', fontFamily: "'Inria Sans', sans-serif" }}
             >
               {/* Modal Header */}
               <div className="p-5 flex items-center justify-between" style={{ borderBottom: panelBorder }}>
                 <div className="flex items-center gap-6">
-                  <h2 className="text-xl font-bold" style={{ color: '#f5f0e8' }}>New Order</h2>
+                  <h2 className="text-xl font-bold" style={{ color: t.textPrimary }}>New Order</h2>
                   <div className="flex items-center gap-2">
                     {[1, 2, 3, 4].map((step) => (
                       <div key={step} className="flex items-center">
                         <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
                           style={{
-                            background: orderStep >= step ? gold : 'rgba(255,255,255,0.1)',
-                            color: orderStep >= step ? '#000' : 'rgba(255,255,255,0.4)',
+                            background: orderStep >= step ? gold : t.inputBorder,
+                            color: orderStep >= step ? '#000' : t.textMuted,
                           }}>
                           {orderStep > step ? <FiCheck size={14} /> : step}
                         </div>
                         <span className="ml-1.5 text-xs font-medium hidden md:block"
-                          style={{ color: orderStep >= step ? gold : 'rgba(255,255,255,0.4)' }}>
+                          style={{ color: orderStep >= step ? gold : t.textMuted }}>
                           {step === 1 ? 'Items' : step === 2 ? 'Payment' : step === 3 ? 'Confirm' : 'Receipt'}
                         </span>
-                        {step < 4 && <div className="w-6 h-0.5 mx-2" style={{ background: orderStep > step ? gold : 'rgba(255,255,255,0.1)' }} />}
+                        {step < 4 && <div className="w-6 h-0.5 mx-2" style={{ background: orderStep > step ? gold : t.inputBorder }} />}
                       </div>
                     ))}
                   </div>
                 </div>
-                <button onClick={resetOrderModal} className="p-2 rounded-lg hover:bg-white/10 transition" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                <button onClick={resetOrderModal} className={`p-2 rounded-lg ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'} transition`} style={{ color: t.textSecondary }}>
                   <FiX size={20} />
                 </button>
               </div>
@@ -454,9 +494,9 @@ export default function OwnerDashboard() {
                           onClick={() => setMenuCategory('all')}
                           className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize"
                           style={{
-                            background: menuCategory === 'all' ? gold : 'rgba(255,255,255,0.04)',
-                            color: menuCategory === 'all' ? '#000' : 'rgba(255,255,255,0.6)',
-                            border: menuCategory === 'all' ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                            background: menuCategory === 'all' ? gold : t.tableBg,
+                            color: menuCategory === 'all' ? '#000' : t.textSecondary,
+                            border: menuCategory === 'all' ? 'none' : `1px solid ${t.modalBorder}`,
                           }}
                         >
                           All
@@ -467,9 +507,9 @@ export default function OwnerDashboard() {
                             onClick={() => setMenuCategory(String(cat.id))}
                             className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize"
                             style={{
-                              background: menuCategory === String(cat.id) ? gold : 'rgba(255,255,255,0.04)',
-                              color: menuCategory === String(cat.id) ? '#000' : 'rgba(255,255,255,0.6)',
-                              border: menuCategory === String(cat.id) ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                              background: menuCategory === String(cat.id) ? gold : t.tableBg,
+                              color: menuCategory === String(cat.id) ? '#000' : t.textSecondary,
+                              border: menuCategory === String(cat.id) ? 'none' : `1px solid ${t.modalBorder}`,
                             }}
                           >
                             {cat.name}
@@ -479,7 +519,7 @@ export default function OwnerDashboard() {
 
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         {filteredMenuProducts.length === 0 ? (
-                          <p className="col-span-full text-center py-8 text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                          <p className="col-span-full text-center py-8 text-sm" style={{ color: t.textFaint }}>
                             No products found.
                           </p>
                         ) : (
@@ -490,10 +530,10 @@ export default function OwnerDashboard() {
                               whileTap={{ scale: 0.98 }}
                               onClick={() => addToCart(product)}
                               className="p-4 rounded-xl text-left transition-all"
-                              style={{ background: 'rgba(255,255,255,0.03)', border: panelBorder }}
+                              style={{ background: t.cardBg, border: panelBorder }}
                             >
-                              <p className="font-medium text-sm mb-1" style={{ color: '#f5f0e8' }}>{product.name}</p>
-                              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{product.category?.name}</p>
+                              <p className="font-medium text-sm mb-1" style={{ color: t.textPrimary }}>{product.name}</p>
+                              <p className="text-xs" style={{ color: t.textMuted }}>{product.category?.name}</p>
                               <p className="text-sm font-bold mt-2" style={{ color: gold }}>
                                 ₱{parseFloat(product.price).toLocaleString('en', { minimumFractionDigits: 2 })}
                               </p>
@@ -504,19 +544,19 @@ export default function OwnerDashboard() {
                     </div>
 
                     {/* Cart sidebar */}
-                    <div className="w-80 flex flex-col" style={{ background: 'rgba(10,10,10,0.5)' }}>
+                    <div className="w-80 flex flex-col" style={{ background: isDark ? 'rgba(10,10,10,0.5)' : 'rgba(0,0,0,0.02)' }}>
                       <div className="p-5" style={{ borderBottom: panelBorder }}>
-                        <h3 className="text-sm font-bold mb-4" style={{ color: '#f5f0e8' }}>Current Order</h3>
+                        <h3 className="text-sm font-bold mb-4" style={{ color: t.textPrimary }}>Current Order</h3>
                         <div className="flex gap-2">
-                          {['dine-in', 'takeout', 'delivery'].map((t) => (
-                            <button key={t} onClick={() => setOrderType(t)}
+                          {['dine-in', 'takeout', 'delivery'].map((typ) => (
+                            <button key={typ} onClick={() => setOrderType(typ)}
                               className="flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all"
                               style={{
-                                background: orderType === t ? gold : 'rgba(255,255,255,0.04)',
-                                color: orderType === t ? '#000' : 'rgba(255,255,255,0.6)',
-                                border: orderType === t ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                                background: orderType === typ ? gold : t.tableBg,
+                                color: orderType === typ ? '#000' : t.textSecondary,
+                                border: orderType === typ ? 'none' : `1px solid ${t.modalBorder}`,
                               }}>
-                              {t}
+                              {typ}
                             </button>
                           ))}
                         </div>
@@ -524,7 +564,7 @@ export default function OwnerDashboard() {
 
                       <div className="flex-1 overflow-y-auto p-5">
                         {cart.length === 0 ? (
-                          <div className="text-center py-8" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                          <div className="text-center py-8" style={{ color: t.textFaint }}>
                             <FiShoppingCart size={40} className="mx-auto mb-3 opacity-50" />
                             <p className="text-sm">No items yet</p>
                           </div>
@@ -532,18 +572,18 @@ export default function OwnerDashboard() {
                           <div className="space-y-3">
                             {cart.map((item) => (
                               <div key={item.product_id} className="flex items-center gap-3 p-3 rounded-lg"
-                                style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                style={{ background: t.cardBg }}>
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-xs truncate" style={{ color: '#f5f0e8' }}>{item.name}</p>
+                                  <p className="font-medium text-xs truncate" style={{ color: t.textPrimary }}>{item.name}</p>
                                   <p className="text-[11px]" style={{ color: gold }}>₱{item.unit_price.toFixed(2)}</p>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <button onClick={() => updateQuantity(item.product_id, -1)}
                                     className="w-6 h-6 rounded-full flex items-center justify-center"
-                                    style={{ background: 'rgba(255,255,255,0.1)' }}>
-                                    <FiMinus size={12} style={{ color: '#f5f0e8' }} />
+                                    style={{ background: t.inputBorder }}>
+                                    <FiMinus size={12} style={{ color: t.textPrimary }} />
                                   </button>
-                                  <span className="w-5 text-center text-xs font-medium" style={{ color: '#f5f0e8' }}>{item.quantity}</span>
+                                  <span className="w-5 text-center text-xs font-medium" style={{ color: t.textPrimary }}>{item.quantity}</span>
                                   <button onClick={() => updateQuantity(item.product_id, 1)}
                                     className="w-6 h-6 rounded-full flex items-center justify-center"
                                     style={{ background: gold }}>
@@ -562,7 +602,7 @@ export default function OwnerDashboard() {
 
                       <div className="p-5" style={{ borderTop: panelBorder }}>
                         <div className="flex justify-between items-center mb-3">
-                          <span className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Subtotal ({cartItemCount} items)</span>
+                          <span className="text-xs" style={{ color: t.textSecondary }}>Subtotal ({cartItemCount} items)</span>
                           <span className="text-lg font-bold" style={{ color: gold }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                         </div>
                         <button
@@ -570,7 +610,7 @@ export default function OwnerDashboard() {
                           disabled={cart.length === 0}
                           className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
                           style={{
-                            background: cart.length > 0 ? `linear-gradient(135deg, ${gold}, #b38f2c)` : 'rgba(255,255,255,0.1)',
+                            background: cart.length > 0 ? `linear-gradient(135deg, ${gold}, ${goldDark})` : 'rgba(255,255,255,0.1)',
                             color: cart.length > 0 ? '#000' : 'rgba(255,255,255,0.3)',
                             cursor: cart.length > 0 ? 'pointer' : 'not-allowed',
                           }}>
@@ -587,26 +627,26 @@ export default function OwnerDashboard() {
                     <div className="max-w-lg w-full">
                       <div className="text-center mb-6">
                         <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
-                          style={{ background: 'rgba(212,175,55,0.15)' }}>
+                          style={{ background: `rgba(${goldRgb},0.15)` }}>
                           <FiCreditCard size={28} style={{ color: gold }} />
                         </div>
-                        <h3 className="text-xl font-bold" style={{ color: '#f5f0e8' }}>Payment & Discount</h3>
-                        <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Select payment method and applicable discount</p>
+                        <h3 className="text-xl font-bold" style={{ color: t.textPrimary }}>Payment & Discount</h3>
+                        <p className="text-sm mt-1" style={{ color: t.textMuted }}>Select payment method and applicable discount</p>
                       </div>
 
                       <div className="mb-6">
-                        <label className="text-xs font-semibold uppercase tracking-wider mb-3 block" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                        <label className="text-xs font-semibold uppercase tracking-wider mb-3 block" style={{ color: t.textSecondary }}>
                           Payment Method
                         </label>
                         <div className="grid grid-cols-3 gap-3">
                           {paymentMethods.map((method) => {
                             const colorMap = {
-                              cash:  { bg: 'rgba(34,197,94,0.15)',  border: '#22c55e', text: '#22c55e' },
+                              cash: { bg: 'rgba(34,197,94,0.15)', border: '#22c55e', text: '#22c55e' },
                               gcash: { bg: 'rgba(59,130,246,0.15)', border: '#3b82f6', text: '#3b82f6' },
-                              card:  { bg: 'rgba(245,158,11,0.15)', border: '#f59e0b', text: '#ef4444' },
+                              card: { bg: 'rgba(245,158,11,0.15)', border: '#f59e0b', text: '#ef4444' },
                             };
                             const key = method.name.toLowerCase();
-                            const c = colorMap[key] || { bg: 'rgba(212,175,55,0.15)', border: gold, text: gold };
+                            const c = colorMap[key] || { bg: `rgba(${goldRgb},0.15)`, border: gold, text: gold };
                             const active = selectedPaymentMethod === method.id;
                             return (
                               <button
@@ -614,12 +654,12 @@ export default function OwnerDashboard() {
                                 onClick={() => setSelectedPaymentMethod(method.id)}
                                 className="p-4 rounded-xl text-center transition-all"
                                 style={{
-                                  background: active ? c.bg : 'rgba(255,255,255,0.03)',
-                                  border: active ? `2px solid ${c.border}` : '1px solid rgba(255,255,255,0.08)',
+                                  background: active ? c.bg : t.cardBg,
+                                  border: active ? `2px solid ${c.border}` : `1px solid ${t.modalBorder}`,
                                 }}
                               >
-                                <FiCreditCard size={20} className="mx-auto mb-2" style={{ color: active ? c.text : 'rgba(255,255,255,0.5)' }} />
-                                <span className="text-sm font-medium" style={{ color: active ? c.text : '#f5f0e8' }}>
+                                <FiCreditCard size={20} className="mx-auto mb-2" style={{ color: active ? c.text : t.textSecondary }} />
+                                <span className="text-sm font-medium" style={{ color: active ? c.text : t.textPrimary }}>
                                   {method.name}
                                 </span>
                               </button>
@@ -629,7 +669,7 @@ export default function OwnerDashboard() {
                       </div>
 
                       <div className="mb-6">
-                        <label className="text-xs font-semibold uppercase tracking-wider mb-3 block" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                        <label className="text-xs font-semibold uppercase tracking-wider mb-3 block" style={{ color: t.textSecondary }}>
                           Discount (20% off)
                         </label>
                         <div className="grid grid-cols-3 gap-3">
@@ -643,14 +683,14 @@ export default function OwnerDashboard() {
                               onClick={() => setDiscountType(opt.key)}
                               className="p-4 rounded-xl text-center transition-all"
                               style={{
-                                background: discountType === opt.key ? (opt.key === 'none' ? 'rgba(255,255,255,0.06)' : 'rgba(52,211,153,0.12)') : 'rgba(255,255,255,0.03)',
-                                border: discountType === opt.key ? (opt.key === 'none' ? '2px solid rgba(255,255,255,0.3)' : '2px solid #34d399') : '1px solid rgba(255,255,255,0.08)',
+                                background: discountType === opt.key ? (opt.key === 'none' ? t.divider : 'rgba(52,211,153,0.12)') : t.cardBg,
+                                border: discountType === opt.key ? (opt.key === 'none' ? `2px solid ${t.textFaint}` : '2px solid #34d399') : `1px solid ${t.modalBorder}`,
                               }}
                             >
-                              <span className="block mx-auto mb-2" style={{ color: discountType === opt.key ? (opt.key === 'none' ? '#f5f0e8' : '#34d399') : 'rgba(255,255,255,0.5)' }}>
+                              <span className="block mx-auto mb-2" style={{ color: discountType === opt.key ? (opt.key === 'none' ? t.textPrimary : '#34d399') : t.textSecondary }}>
                                 {opt.icon}
                               </span>
-                              <span className="text-xs font-medium" style={{ color: discountType === opt.key ? (opt.key === 'none' ? '#f5f0e8' : '#34d399') : 'rgba(255,255,255,0.6)' }}>
+                              <span className="text-xs font-medium" style={{ color: discountType === opt.key ? (opt.key === 'none' ? t.textPrimary : '#34d399') : t.textSecondary }}>
                                 {opt.label}
                               </span>
                             </button>
@@ -658,10 +698,10 @@ export default function OwnerDashboard() {
                         </div>
                       </div>
 
-                      <div className="p-4 rounded-xl mb-6" style={{ background: 'rgba(255,255,255,0.03)', border: panelBorder }}>
+                      <div className="p-4 rounded-xl mb-6" style={{ background: t.cardBg, border: panelBorder }}>
                         <div className="flex justify-between text-sm mb-2">
-                          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Subtotal ({cartItemCount} items)</span>
-                          <span style={{ color: '#f5f0e8' }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                          <span style={{ color: t.textSecondary }}>Subtotal ({cartItemCount} items)</span>
+                          <span style={{ color: t.textPrimary }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                         </div>
                         {discountType !== 'none' && (
                           <div className="flex justify-between text-sm mb-2">
@@ -670,13 +710,13 @@ export default function OwnerDashboard() {
                           </div>
                         )}
                         <div className="flex justify-between items-center pt-2" style={{ borderTop: panelBorder }}>
-                          <span className="font-bold" style={{ color: '#f5f0e8' }}>Total</span>
+                          <span className="font-bold" style={{ color: t.textPrimary }}>Total</span>
                           <span className="text-xl font-bold" style={{ color: gold }}>₱{finalTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                         </div>
                       </div>
 
                       <div className="mb-6">
-                        <label className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                        <label className="text-xs font-semibold uppercase tracking-wider mb-2 block" style={{ color: t.textSecondary }}>
                           Amount Paid
                         </label>
                         <div className="relative">
@@ -689,12 +729,12 @@ export default function OwnerDashboard() {
                             onChange={(e) => setAmountPaid(e.target.value)}
                             placeholder={finalTotal.toFixed(2)}
                             className="w-full pl-10 pr-4 py-3 rounded-xl text-lg font-bold"
-                            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#f5f0e8', outline: 'none' }}
+                            style={{ ...inputStyle }}
                           />
                         </div>
                         {amountPaid && parseFloat(amountPaid) >= finalTotal && (
                           <div className="mt-2 flex justify-between text-sm">
-                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>Change</span>
+                            <span style={{ color: t.textSecondary }}>Change</span>
                             <span className="font-bold" style={{ color: '#34d399' }}>₱{changeAmount.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                           </div>
                         )}
@@ -703,7 +743,7 @@ export default function OwnerDashboard() {
                       <div className="flex gap-3">
                         <button onClick={() => setOrderStep(1)}
                           className="flex-1 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-                          style={{ background: 'rgba(255,255,255,0.08)', color: '#f5f0e8', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          style={{ background: t.modalBorder, color: t.textPrimary, border: `1px solid ${t.inputBorder}` }}>
                           <FiArrowLeft size={14} /> Back
                         </button>
                         <button
@@ -728,32 +768,32 @@ export default function OwnerDashboard() {
                     <div className="max-w-lg w-full">
                       <div className="text-center mb-6">
                         <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
-                          style={{ background: 'rgba(212,175,55,0.15)' }}>
+                          style={{ background: `rgba(${goldRgb},0.15)` }}>
                           <FiCheck size={32} style={{ color: gold }} />
                         </div>
-                        <h3 className="text-xl font-bold" style={{ color: '#f5f0e8' }}>Confirm Order</h3>
-                        <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Review everything before submitting</p>
+                        <h3 className="text-xl font-bold" style={{ color: t.textPrimary }}>Confirm Order</h3>
+                        <p className="text-sm mt-1" style={{ color: t.textMuted }}>Review everything before submitting</p>
                       </div>
 
-                      <div className="p-5 rounded-xl mb-6" style={{ background: 'rgba(255,255,255,0.03)', border: panelBorder }}>
+                      <div className="p-5 rounded-xl mb-6" style={{ background: t.cardBg, border: panelBorder }}>
                         <div className="mb-3 pb-3" style={{ borderBottom: panelBorder }}>
-                          <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Type</p>
-                          <p className="text-sm font-medium capitalize" style={{ color: '#f5f0e8' }}>{orderType}</p>
+                          <p className="text-[11px]" style={{ color: t.textMuted }}>Type</p>
+                          <p className="text-sm font-medium capitalize" style={{ color: t.textPrimary }}>{orderType}</p>
                         </div>
 
                         <div className="space-y-2 mb-3 pb-3" style={{ borderBottom: panelBorder }}>
                           {cart.map((item) => (
                             <div key={item.product_id} className="flex justify-between text-sm">
-                              <span style={{ color: 'rgba(255,255,255,0.6)' }}>{item.name} × {item.quantity}</span>
-                              <span style={{ color: '#f5f0e8' }}>₱{(item.unit_price * item.quantity).toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                              <span style={{ color: t.textSecondary }}>{item.name} × {item.quantity}</span>
+                              <span style={{ color: t.textPrimary }}>₱{(item.unit_price * item.quantity).toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                             </div>
                           ))}
                         </div>
 
                         <div className="space-y-2 mb-3 pb-3" style={{ borderBottom: panelBorder }}>
                           <div className="flex justify-between text-sm">
-                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>Subtotal</span>
-                            <span style={{ color: '#f5f0e8' }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                            <span style={{ color: t.textSecondary }}>Subtotal</span>
+                            <span style={{ color: t.textPrimary }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                           </div>
                           {discountType !== 'none' && (
                             <div className="flex justify-between text-sm">
@@ -762,24 +802,24 @@ export default function OwnerDashboard() {
                             </div>
                           )}
                           <div className="flex justify-between text-sm font-bold">
-                            <span style={{ color: '#f5f0e8' }}>Total</span>
+                            <span style={{ color: t.textPrimary }}>Total</span>
                             <span style={{ color: gold }}>₱{finalTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                           </div>
                         </div>
 
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>Payment Method</span>
-                            <span className="font-medium" style={{ color: '#f5f0e8' }}>
+                            <span style={{ color: t.textSecondary }}>Payment Method</span>
+                            <span className="font-medium" style={{ color: t.textPrimary }}>
                               {paymentMethods.find((m) => m.id === selectedPaymentMethod)?.name || '—'}
                             </span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>Amount Paid</span>
-                            <span className="font-medium" style={{ color: '#f5f0e8' }}>₱{parseFloat(amountPaid).toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                            <span style={{ color: t.textSecondary }}>Amount Paid</span>
+                            <span className="font-medium" style={{ color: t.textPrimary }}>₱{parseFloat(amountPaid).toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>Change</span>
+                            <span style={{ color: t.textSecondary }}>Change</span>
                             <span className="font-bold" style={{ color: '#34d399' }}>₱{changeAmount.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                           </div>
                         </div>
@@ -788,7 +828,7 @@ export default function OwnerDashboard() {
                       <div className="flex gap-3">
                         <button onClick={() => setOrderStep(2)}
                           className="flex-1 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-                          style={{ background: 'rgba(255,255,255,0.08)', color: '#f5f0e8', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          style={{ background: t.modalBorder, color: t.textPrimary, border: `1px solid ${t.inputBorder}` }}>
                           <FiArrowLeft size={14} /> Back
                         </button>
                         <button onClick={completeOrder} disabled={submitting}
@@ -810,8 +850,8 @@ export default function OwnerDashboard() {
                           style={{ background: 'rgba(52,211,153,0.15)' }}>
                           <FiCheckCircle size={32} style={{ color: '#34d399' }} />
                         </div>
-                        <h3 className="text-xl font-bold" style={{ color: '#f5f0e8' }}>Order Complete!</h3>
-                        <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Order #{String(receiptData.receipt.order_id).padStart(4, '0')}</p>
+                        <h3 className="text-xl font-bold" style={{ color: t.textPrimary }}>Order Complete!</h3>
+                        <p className="text-sm mt-1" style={{ color: t.textMuted }}>Order #{String(receiptData.receipt.order_id).padStart(4, '0')}</p>
                       </div>
 
                       <div ref={receiptRef} className="p-6 rounded-xl mb-6" style={{ background: '#fff', color: '#000' }}>
@@ -906,13 +946,13 @@ export default function OwnerDashboard() {
                             win.close();
                           }}
                           className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
-                          style={{ background: 'rgba(255,255,255,0.08)', color: '#f5f0e8', border: '1px solid rgba(255,255,255,0.1)' }}
+                          style={{ background: t.modalBorder, color: t.textPrimary, border: `1px solid ${t.inputBorder}` }}
                         >
                           <FiPrinter size={14} /> Print Receipt
                         </button>
                         <button onClick={resetOrderModal}
                           className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
-                          style={{ background: `linear-gradient(135deg, ${gold}, #b38f2c)`, color: '#000' }}>
+                          style={{ background: `linear-gradient(135deg, ${gold}, ${goldDark})`, color: '#000' }}>
                           Done
                         </button>
                       </div>
@@ -930,10 +970,11 @@ export default function OwnerDashboard() {
 
 function StatusBadge({ status }) {
   const map = {
-    pending:    { bg: 'rgba(251,191,36,0.12)', color: '#fbbf24' },
-    preparing:  { bg: 'rgba(96,165,250,0.12)', color: '#60a5fa' },
-    completed:  { bg: 'rgba(52,211,153,0.12)', color: '#34d399' },
-    cancelled:  { bg: 'rgba(248,113,113,0.12)', color: '#f87171' },
+    pending: { bg: 'rgba(251,191,36,0.12)', color: '#fbbf24' },
+    preparing: { bg: 'rgba(96,165,250,0.12)', color: '#60a5fa' },
+    completed: { bg: 'rgba(52,211,153,0.12)', color: '#34d399' },
+    served: { bg: 'rgba(16,185,129,0.12)', color: '#10b981' },
+    cancelled: { bg: 'rgba(248,113,113,0.12)', color: '#f87171' },
   };
   const s = map[status] || map.pending;
   return (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import { orderService, paymentService } from '../../api';
 import { motion } from 'framer-motion';
 import {
@@ -7,10 +8,6 @@ import {
   FiFilter, FiDollarSign, FiClock, FiCheckCircle, FiXCircle,
   FiShoppingBag,
 } from 'react-icons/fi';
-
-const gold = '#d4af37';
-const panelBg = 'rgba(255,255,255,0.03)';
-const panelBorder = '1px solid rgba(255,255,255,0.06)';
 
 /* ─── Status badge ─── */
 function StatusBadge({ status }) {
@@ -31,25 +28,29 @@ function StatusBadge({ status }) {
 }
 
 /* ─── Stat card ─── */
-const StatCard = ({ icon, label, value, color }) => (
-  <div className="rounded-xl p-5 flex items-center gap-4"
-    style={{ background: panelBg, border: panelBorder }}>
-    <div className="w-11 h-11 rounded-lg flex items-center justify-center"
-      style={{ background: `${color}18`, color }}>
-      {icon}
+const StatCard = ({ icon, label, value, color }) => {
+  const { t, panelBg, panelBorder } = useSettings();
+  return (
+    <div className="rounded-xl p-5 flex items-center gap-4"
+      style={{ background: panelBg, border: panelBorder }}>
+      <div className="w-11 h-11 rounded-lg flex items-center justify-center"
+        style={{ background: `${color}18`, color }}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-[11px] uppercase tracking-wider" style={{ color: t.textMuted }}>{label}</p>
+        <p className="text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{value}</p>
+      </div>
     </div>
-    <div>
-      <p className="text-[11px] uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</p>
-      <p className="text-xl font-bold mt-0.5" style={{ color: '#f5f0e8' }}>{value}</p>
-    </div>
-  </div>
-);
+  );
+};
 
 /* ═══════════════════════════════════════════════════════
    ORDERS PAGE
    ═══════════════════════════════════════════════════════ */
 export default function OrdersPage() {
   const { user } = useAuth();
+  const { gold, goldRgb, isDark, t, panelBg, panelBorder, inputStyle } = useSettings();
   const role = user?.role?.slug;
   const isCashier = role === 'cashier';
 
@@ -118,8 +119,8 @@ export default function OrdersPage() {
 
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: '#f5f0e8' }}>Orders</h1>
-        <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+        <h1 className="text-2xl font-bold" style={{ color: t.textPrimary }}>Orders</h1>
+        <p className="text-sm mt-1" style={{ color: t.textMuted }}>
           {isCashier ? 'View and manage your orders.' : 'All orders across the system.'}
         </p>
       </motion.div>
@@ -143,10 +144,10 @@ export default function OrdersPage() {
             <FiShoppingBag size={20} />
           </div>
           <div className="flex-1">
-            <p className="text-[11px] uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>Products Sold</p>
-            <p className="text-xl font-bold mt-0.5" style={{ color: '#f5f0e8' }}>{totalProductsSold}</p>
+            <p className="text-[11px] uppercase tracking-wider" style={{ color: t.textMuted }}>Products Sold</p>
+            <p className="text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{totalProductsSold}</p>
           </div>
-          <div style={{ color: 'rgba(255,255,255,0.3)' }}>
+          <div style={{ color: t.textFaint }}>
             {showProductSales ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
           </div>
         </div>
@@ -161,7 +162,7 @@ export default function OrdersPage() {
           style={{ background: panelBg, border: panelBorder }}
         >
           <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: panelBorder }}>
-            <h2 className="text-sm font-semibold" style={{ color: '#f5f0e8' }}>
+            <h2 className="text-sm font-semibold" style={{ color: t.textPrimary }}>
               Product Sales Breakdown
               <span className="ml-2 text-[10px] uppercase tracking-wider px-2 py-1 rounded-md"
                 style={{ background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>
@@ -171,27 +172,27 @@ export default function OrdersPage() {
           </div>
           <div className="overflow-x-auto" style={{ maxHeight: '320px', overflowY: 'auto' }}>
             <table className="w-full text-sm">
-              <thead className="sticky top-0" style={{ background: '#0d0d0d' }}>
+              <thead className="sticky top-0" style={{ background: isDark ? '#0d0d0d' : '#fff' }}>
                 <tr style={{ borderBottom: panelBorder }}>
                   {['#', 'Product', 'Qty Sold', 'Total Revenue'].map((h) => (
                     <th key={h} className="px-5 py-3 text-left text-[11px] uppercase tracking-wider font-semibold"
-                      style={{ color: 'rgba(255,255,255,0.35)' }}>{h}</th>
+                      style={{ color: t.textFaint }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {productSalesList.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-5 py-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                    <td colSpan={4} className="px-5 py-8 text-center text-sm" style={{ color: t.textFaint }}>
                       No products sold yet.
                     </td>
                   </tr>
                 ) : (
                   productSalesList.map((p, idx) => (
-                    <tr key={p.name} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                      className="hover:bg-white/[0.02] transition">
-                      <td className="px-5 py-3 text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>{idx + 1}</td>
-                      <td className="px-5 py-3 text-xs font-medium" style={{ color: '#f5f0e8' }}>{p.name}</td>
+                    <tr key={p.name} style={{ borderBottom: `1px solid ${t.divider}` }}
+                      className={`${isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-black/[0.02]'} transition`}>
+                      <td className="px-5 py-3 text-xs" style={{ color: t.textFaint }}>{idx + 1}</td>
+                      <td className="px-5 py-3 text-xs font-medium" style={{ color: t.textPrimary }}>{p.name}</td>
                       <td className="px-5 py-3">
                         <span className="text-xs font-bold px-2.5 py-1 rounded-md"
                           style={{ background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>
@@ -215,29 +216,29 @@ export default function OrdersPage() {
         className="flex items-center gap-3 mb-5 flex-wrap">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: t.textFaint }} />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by order #, product, cashier..."
             className="w-full pl-9 pr-3 py-2.5 rounded-lg text-xs"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#f5f0e8', outline: 'none' }}
+            style={{ background: t.tableBg, border: `1px solid ${t.inputBorder}`, color: t.textPrimary, outline: 'none' }}
           />
         </div>
 
         {/* Status filter pills */}
         <div className="flex items-center gap-2">
-          <FiFilter size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <FiFilter size={14} style={{ color: t.textFaint }} />
           {['all', 'pending', 'preparing', 'completed', 'cancelled'].map((st) => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
               className="px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all"
               style={{
-                background: statusFilter === st ? gold : 'rgba(255,255,255,0.04)',
-                color: statusFilter === st ? '#000' : 'rgba(255,255,255,0.5)',
-                border: statusFilter === st ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                background: statusFilter === st ? gold : t.tableBg,
+                color: statusFilter === st ? '#000' : t.textSecondary,
+                border: statusFilter === st ? 'none' : `1px solid ${t.modalBorder}`,
               }}
             >
               {st}
@@ -253,11 +254,11 @@ export default function OrdersPage() {
 
         <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10" style={{ background: '#0d0d0d' }}>
+            <thead className="sticky top-0 z-10" style={{ background: isDark ? '#0d0d0d' : '#fff' }}>
               <tr style={{ borderBottom: panelBorder }}>
                 {['', 'Order #', ...(isCashier ? [] : ['Cashier']), 'Type', 'Items', 'Discount', 'Total', 'Payment', 'Status', 'Date & Time'].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-[11px] uppercase tracking-wider font-semibold whitespace-nowrap"
-                    style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    style={{ color: t.textFaint }}>
                     {h}
                   </th>
                 ))}
@@ -266,13 +267,13 @@ export default function OrdersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={isCashier ? 9 : 10} className="px-5 py-12 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                  <td colSpan={isCashier ? 9 : 10} className="px-5 py-12 text-center text-sm" style={{ color: t.textFaint }}>
                     Loading orders…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={isCashier ? 9 : 10} className="px-5 py-12 text-center text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                  <td colSpan={isCashier ? 9 : 10} className="px-5 py-12 text-center text-sm" style={{ color: t.textFaint }}>
                     {search || statusFilter !== 'all' ? 'No orders match your filters.' : 'No orders found.'}
                   </td>
                 </tr>
@@ -288,31 +289,31 @@ export default function OrdersPage() {
                   return (
                     <React.Fragment key={order.id}>
                       <tr
-                        className="hover:bg-white/[0.02] transition cursor-pointer"
-                        style={{ borderBottom: isExpanded ? 'none' : '1px solid rgba(255,255,255,0.04)' }}
+                        className={`${isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-black/[0.02]'} transition cursor-pointer`}
+                        style={{ borderBottom: isExpanded ? 'none' : `1px solid ${t.divider}` }}
                         onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
                       >
                         <td className="pl-4 py-3">
                           {isExpanded
                             ? <FiChevronUp size={14} style={{ color: gold }} />
-                            : <FiChevronDown size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                            : <FiChevronDown size={14} style={{ color: t.textFaint }} />
                           }
                         </td>
                         <td className="px-4 py-3 font-mono text-xs" style={{ color: gold }}>
                           #{String(order.id).padStart(4, '0')}
                         </td>
                         {!isCashier && (
-                          <td className="px-4 py-3 text-xs" style={{ color: '#f5f0e8' }}>
+                          <td className="px-4 py-3 text-xs" style={{ color: t.textPrimary }}>
                             {order.cashier?.name || 'Unknown'}
                           </td>
                         )}
                         <td className="px-4 py-3">
                           <span className="text-[10px] uppercase px-2 py-0.5 rounded-md font-semibold"
-                            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}>
+                            style={{ background: t.divider, color: t.textSecondary }}>
                             {order.order_type}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                        <td className="px-4 py-3 text-xs" style={{ color: t.textSecondary }}>
                           {items.length} item{items.length !== 1 ? 's' : ''}
                         </td>
                         <td className="px-4 py-3">
@@ -322,19 +323,19 @@ export default function OrdersPage() {
                               {order.discount_type} 20%
                             </span>
                           ) : (
-                            <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>—</span>
+                            <span className="text-[10px]" style={{ color: t.textFaint }}>—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 font-semibold" style={{ color: '#f5f0e8' }}>
+                        <td className="px-4 py-3 font-semibold" style={{ color: t.textPrimary }}>
                           ₱{parseFloat(order.total_amount).toLocaleString('en', { minimumFractionDigits: 2 })}
                         </td>
-                        <td className="px-4 py-3 text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                        <td className="px-4 py-3 text-xs" style={{ color: t.textSecondary }}>
                           {paymentMethodName}
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge status={order.status} />
                         </td>
-                        <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                        <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: t.textMuted }}>
                           {order.created_at
                             ? <>
                                 {new Date(order.created_at).toLocaleDateString()}{' '}
@@ -346,28 +347,28 @@ export default function OrdersPage() {
 
                       {/* ── Expanded detail row ── */}
                       {isExpanded && (
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                          <td colSpan={colCount} className="px-6 py-5" style={{ background: 'rgba(255,255,255,0.015)' }}>
+                        <tr style={{ borderBottom: `1px solid ${t.divider}` }}>
+                          <td colSpan={colCount} className="px-6 py-5" style={{ background: t.tableBg }}>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                               {/* Items breakdown */}
                               <div className="md:col-span-2">
                                 <h4 className="text-[11px] uppercase tracking-wider font-semibold mb-3"
-                                  style={{ color: 'rgba(255,255,255,0.4)' }}>Order Items</h4>
+                                  style={{ color: t.textMuted }}>Order Items</h4>
                                 <div className="space-y-2">
                                   {items.map((item, idx) => (
                                     <div key={idx} className="flex justify-between items-center p-3 rounded-lg"
-                                      style={{ background: 'rgba(255,255,255,0.03)' }}>
+                                      style={{ background: t.cardBg }}>
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-xs font-medium" style={{ color: '#f5f0e8' }}>
+                                        <span className="text-xs font-medium" style={{ color: t.textPrimary }}>
                                           {item.product?.name || `Product #${item.product_id}`}
                                         </span>
                                         {item.variant?.name && (
                                           <span className="text-[10px] px-1.5 py-0.5 rounded"
-                                            style={{ background: 'rgba(212,175,55,0.1)', color: gold }}>
+                                            style={{ background: `rgba(${goldRgb},0.1)`, color: gold }}>
                                             {item.variant.name}
                                           </span>
                                         )}
-                                        <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                                        <span className="text-[11px]" style={{ color: t.textFaint }}>
                                           ₱{parseFloat(item.unit_price).toFixed(2)} × {item.quantity}
                                         </span>
                                       </div>
@@ -382,11 +383,11 @@ export default function OrdersPage() {
                               {/* Payment & summary */}
                               <div>
                                 <h4 className="text-[11px] uppercase tracking-wider font-semibold mb-3"
-                                  style={{ color: 'rgba(255,255,255,0.4)' }}>Payment Summary</h4>
-                                <div className="p-4 rounded-xl space-y-2" style={{ background: 'rgba(255,255,255,0.03)', border: panelBorder }}>
+                                  style={{ color: t.textMuted }}>Payment Summary</h4>
+                                <div className="p-4 rounded-xl space-y-2" style={{ background: t.cardBg, border: panelBorder }}>
                                   <div className="flex justify-between text-xs">
-                                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>Subtotal</span>
-                                    <span style={{ color: '#f5f0e8' }}>₱{subtotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                                    <span style={{ color: t.textSecondary }}>Subtotal</span>
+                                    <span style={{ color: t.textPrimary }}>₱{subtotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                                   </div>
                                   {order.discount_type && order.discount_type !== 'none' && (
                                     <div className="flex justify-between text-xs">
@@ -394,28 +395,28 @@ export default function OrdersPage() {
                                       <span style={{ color: '#34d399' }}>-₱{parseFloat(order.discount_amount || 0).toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                                     </div>
                                   )}
-                                  <div className="flex justify-between text-xs font-bold pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                                    <span style={{ color: '#f5f0e8' }}>Total</span>
+                                  <div className="flex justify-between text-xs font-bold pt-2" style={{ borderTop: `1px solid ${t.divider}` }}>
+                                    <span style={{ color: t.textPrimary }}>Total</span>
                                     <span style={{ color: gold }}>₱{parseFloat(order.total_amount).toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                                   </div>
 
                                   {payment && (
                                     <>
-                                      <div className="my-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+                                      <div className="my-2" style={{ borderTop: `1px solid ${t.divider}` }} />
                                       <div className="flex justify-between text-xs">
-                                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>Method</span>
-                                        <span className="font-medium" style={{ color: '#f5f0e8' }}>{paymentMethodName}</span>
+                                        <span style={{ color: t.textSecondary }}>Method</span>
+                                        <span className="font-medium" style={{ color: t.textPrimary }}>{paymentMethodName}</span>
                                       </div>
                                       <div className="flex justify-between text-xs">
-                                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>Amount Paid</span>
-                                        <span style={{ color: '#f5f0e8' }}>₱{parseFloat(payment.amount_paid || 0).toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                                        <span style={{ color: t.textSecondary }}>Amount Paid</span>
+                                        <span style={{ color: t.textPrimary }}>₱{parseFloat(payment.amount_paid || 0).toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                                       </div>
                                       <div className="flex justify-between text-xs">
-                                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>Change</span>
+                                        <span style={{ color: t.textSecondary }}>Change</span>
                                         <span className="font-semibold" style={{ color: '#34d399' }}>₱{parseFloat(payment.change_amount || 0).toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                                       </div>
                                       <div className="flex justify-between text-xs">
-                                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>Payment Status</span>
+                                        <span style={{ color: t.textSecondary }}>Payment Status</span>
                                         <StatusBadge status={payment.status || 'paid'} />
                                       </div>
                                     </>
@@ -423,10 +424,10 @@ export default function OrdersPage() {
 
                                   {!isCashier && (
                                     <>
-                                      <div className="my-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+                                      <div className="my-2" style={{ borderTop: `1px solid ${t.divider}` }} />
                                       <div className="flex justify-between text-xs">
-                                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>Cashier</span>
-                                        <span style={{ color: '#f5f0e8' }}>{order.cashier?.name || 'Unknown'}</span>
+                                        <span style={{ color: t.textSecondary }}>Cashier</span>
+                                        <span style={{ color: t.textPrimary }}>{order.cashier?.name || 'Unknown'}</span>
                                       </div>
                                     </>
                                   )}
