@@ -138,7 +138,11 @@ export default function OwnerDashboard() {
     }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    fetchAll();
+    const interval = setInterval(fetchAll, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   /* if modal was restored from session, reload products + payment methods */
   useEffect(() => {
@@ -250,8 +254,6 @@ export default function OwnerDashboard() {
   const filteredMenuProducts = menuCategory === 'all'
     ? products.filter((p) => p.is_available !== false)
     : products.filter((p) => p.category_id === parseInt(menuCategory) && p.is_available !== false);
-
-  useEffect(() => { fetchAll(); }, []);
 
   /* paginated data */
   const paginatedOrders = recentOrders.slice((ordersPage - 1) * ITEMS_PER_PAGE, ordersPage * ITEMS_PER_PAGE);
@@ -453,7 +455,7 @@ export default function OwnerDashboard() {
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-6xl overflow-hidden rounded-2xl flex flex-col"
-              style={{ background: t.modalBg, border: `1px solid ${t.inputBorder}`, height: '85vh', fontFamily: "'Inria Sans', sans-serif" }}
+              style={{ background: t.modalBg, border: t.inputBorder, height: '85vh', fontFamily: "'Inria Sans', sans-serif" }}
             >
               {/* Modal Header */}
               <div className="p-5 flex items-center justify-between" style={{ borderBottom: panelBorder }}>
@@ -496,7 +498,7 @@ export default function OwnerDashboard() {
                           style={{
                             background: menuCategory === 'all' ? gold : t.tableBg,
                             color: menuCategory === 'all' ? '#000' : t.textSecondary,
-                            border: menuCategory === 'all' ? 'none' : `1px solid ${t.modalBorder}`,
+                            border: menuCategory === 'all' ? 'none' : t.modalBorder,
                           }}
                         >
                           All
@@ -509,7 +511,7 @@ export default function OwnerDashboard() {
                             style={{
                               background: menuCategory === String(cat.id) ? gold : t.tableBg,
                               color: menuCategory === String(cat.id) ? '#000' : t.textSecondary,
-                              border: menuCategory === String(cat.id) ? 'none' : `1px solid ${t.modalBorder}`,
+                              border: menuCategory === String(cat.id) ? 'none' : t.modalBorder,
                             }}
                           >
                             {cat.name}
@@ -554,7 +556,7 @@ export default function OwnerDashboard() {
                               style={{
                                 background: orderType === typ ? gold : t.tableBg,
                                 color: orderType === typ ? '#000' : t.textSecondary,
-                                border: orderType === typ ? 'none' : `1px solid ${t.modalBorder}`,
+                                border: orderType === typ ? 'none' : t.modalBorder,
                               }}>
                               {typ}
                             </button>
@@ -655,7 +657,7 @@ export default function OwnerDashboard() {
                                 className="p-4 rounded-xl text-center transition-all"
                                 style={{
                                   background: active ? c.bg : t.cardBg,
-                                  border: active ? `2px solid ${c.border}` : `1px solid ${t.modalBorder}`,
+                                  border: active ? `2px solid ${c.border}` : t.modalBorder,
                                 }}
                               >
                                 <FiCreditCard size={20} className="mx-auto mb-2" style={{ color: active ? c.text : t.textSecondary }} />
@@ -684,7 +686,7 @@ export default function OwnerDashboard() {
                               className="p-4 rounded-xl text-center transition-all"
                               style={{
                                 background: discountType === opt.key ? (opt.key === 'none' ? t.divider : 'rgba(52,211,153,0.12)') : t.cardBg,
-                                border: discountType === opt.key ? (opt.key === 'none' ? `2px solid ${t.textFaint}` : '2px solid #34d399') : `1px solid ${t.modalBorder}`,
+                                border: discountType === opt.key ? (opt.key === 'none' ? `2px solid ${t.textFaint}` : '2px solid #34d399') : t.modalBorder,
                               }}
                             >
                               <span className="block mx-auto mb-2" style={{ color: discountType === opt.key ? (opt.key === 'none' ? t.textPrimary : '#34d399') : t.textSecondary }}>
@@ -743,7 +745,7 @@ export default function OwnerDashboard() {
                       <div className="flex gap-3">
                         <button onClick={() => setOrderStep(1)}
                           className="flex-1 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-                          style={{ background: t.modalBorder, color: t.textPrimary, border: `1px solid ${t.inputBorder}` }}>
+                          style={{ background: t.hoverBg, color: t.textPrimary, border: t.inputBorder }}>
                           <FiArrowLeft size={14} /> Back
                         </button>
                         <button
@@ -828,7 +830,7 @@ export default function OwnerDashboard() {
                       <div className="flex gap-3">
                         <button onClick={() => setOrderStep(2)}
                           className="flex-1 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-                          style={{ background: t.modalBorder, color: t.textPrimary, border: `1px solid ${t.inputBorder}` }}>
+                          style={{ background: t.hoverBg, color: t.textPrimary, border: t.inputBorder }}>
                           <FiArrowLeft size={14} /> Back
                         </button>
                         <button onClick={completeOrder} disabled={submitting}
@@ -946,7 +948,7 @@ export default function OwnerDashboard() {
                             win.close();
                           }}
                           className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
-                          style={{ background: t.modalBorder, color: t.textPrimary, border: `1px solid ${t.inputBorder}` }}
+                          style={{ background: t.hoverBg, color: t.textPrimary, border: t.inputBorder }}
                         >
                           <FiPrinter size={14} /> Print Receipt
                         </button>

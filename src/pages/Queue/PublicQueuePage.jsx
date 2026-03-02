@@ -192,7 +192,7 @@ function QueueColumn({ title, orders, gold, goldRgb, t, panelBg, panelBorder, ic
   );
 }
 
-function ServingNowColumn({ orders, gold, goldRgb, t, panelBg, panelBorder, onConfirm, confirmingId }) {
+function ServingNowColumn({ orders, gold, goldRgb, t, panelBg, panelBorder }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -251,14 +251,7 @@ function ServingNowColumn({ orders, gold, goldRgb, t, panelBg, panelBorder, onCo
                 </span>
               </div>
 
-              <button
-                onClick={() => onConfirm(order.id)}
-                disabled={confirmingId === order.id}
-                className="w-full py-2.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
-                style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}
-              >
-                {confirmingId === order.id ? 'Confirming…' : 'Confirm Served / Picked Up'}
-              </button>
+
             </div>
           ))
         )}
@@ -273,7 +266,6 @@ export default function PublicQueuePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [confirmingOrderId, setConfirmingOrderId] = useState(null);
   const seenOrderIdsRef = useRef(new Set());
   const hasInitializedRef = useRef(false);
 
@@ -305,9 +297,14 @@ export default function PublicQueuePage() {
   const fetchQueue = useCallback(async () => {
     try {
       setError('');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const res = await fetch(`${API_URL}/orders/queue/upcoming`, {
         headers: { Accept: 'application/json' },
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         throw new Error('Failed to load queue');
@@ -335,36 +332,15 @@ export default function PublicQueuePage() {
     }
   }, [announceOrderNumber]);
 
-  const confirmServed = async (orderId) => {
-    if (confirmingOrderId) return;
-    setConfirmingOrderId(orderId);
-    try {
-      const res = await fetch(`${API_URL}/orders/${orderId}/confirm-served`, {
-        method: 'POST',
-        headers: { Accept: 'application/json' },
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to confirm served order');
-      }
-
-      await fetchQueue();
-    } catch (err) {
-      alert(err.message || 'Failed to confirm served order');
-    } finally {
-      setConfirmingOrderId(null);
-    }
-  };
-
   useEffect(() => {
     fetchQueue();
-    const interval = setInterval(fetchQueue, 15000);
+    const interval = setInterval(fetchQueue, 5000);
     return () => clearInterval(interval);
   }, [fetchQueue]);
 
   const preparingOrders = useMemo(() => (
     orders
-      .filter((o) => o.status === 'preparing')
+      .filter((o) => o.status === 'pending' || o.status === 'preparing')
       .sort((a, b) => a.id - b.id)
   ), [orders]);
 
@@ -506,8 +482,6 @@ export default function PublicQueuePage() {
             t={t} 
             panelBg={panelBg} 
             panelBorder={panelBorder}
-            onConfirm={confirmServed}
-            confirmingId={confirmingOrderId}
           />
         </div>
       )}
