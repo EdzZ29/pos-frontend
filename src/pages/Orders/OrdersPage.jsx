@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
-import { orderService, paymentService } from '../../api';
+import { useData } from '../../context/DataContext';
+import { orderService } from '../../api';
 import { motion } from 'framer-motion';
 import {
   FiFileText, FiSearch, FiChevronDown, FiChevronUp,
@@ -51,29 +52,20 @@ const StatCard = ({ icon, label, value, color }) => {
 export default function OrdersPage() {
   const { user } = useAuth();
   const { gold, goldRgb, isDark, t, panelBg, panelBorder, inputStyle } = useSettings();
+  const { orders: allOrders, loading, setOrderStatus, refreshOrders } = useData();
   const role = user?.role?.slug;
   const isCashier = role === 'cashier';
 
-  const [orders, setOrders] = useState([]);
+  // Cashiers see only their own orders; derive this with useMemo for performance
+  const orders = useMemo(
+    () => (isCashier ? allOrders.filter((o) => o.user_id === user?.id) : allOrders),
+    [allOrders, isCashier, user]
+  );
+
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [loading, setLoading] = useState(true);
   const [showProductSales, setShowProductSales] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const all = await orderService.getAll();
-        // Cashiers see only their own orders
-        setOrders(isCashier ? all.filter((o) => o.user_id === user?.id) : all);
-      } catch (err) {
-        console.error('Failed to load orders', err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [user, isCashier]);
 
   /* ── derived stats ── */
   const totalRevenue = orders

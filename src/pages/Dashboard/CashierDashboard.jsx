@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
-import { orderService, paymentService, productService, categoryService } from '../../api';
+import { useData } from '../../context/DataContext';
+import { orderService, paymentService } from '../../api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiShoppingCart, FiFileText, FiDollarSign, FiClock,
@@ -20,15 +21,51 @@ export default function CashierDashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  const [stats, setStats] = useState({
-    myOrders: 0, myPending: 0, myCompleted: 0, myRevenue: 0,
-  });
+  const {
+    products: allProducts,
+    categories: allCategories,
+    orders: allOrders,
+    payments: allPayments,
+    paymentMethods: ctxPaymentMethods,
+    refreshOrders,
+    refreshPayments,
+    prependOrder,
+    setOrderStatus: ctxSetOrderStatus,
+  } = useData();
+
+  // Cashier-scoped views
+  const recentOrders = useMemo(
+    () => allOrders.filter((o) => o.user_id === user?.id),
+    [allOrders, user]
+  );
+  const products = useMemo(
+    () => allProducts.filter((p) => p.is_available !== false),
+    [allProducts]
+  );
+  const categories = useMemo(
+    () => allCategories.filter((c) => c.is_active !== false),
+    [allCategories]
+  );
+  const paymentMethods = ctxPaymentMethods;
+
+  const stats = useMemo(() => {
+    const mine = recentOrders;
+    const myPayments = allPayments.filter(
+      (p) => p.processed_by === user?.id && p.status === 'paid'
+    );
+    const myRevenue = myPayments.reduce((s, p) => s + parseFloat(p.amount_paid || 0), 0);
+    const myTotalAmount = mine.reduce((s, o) => s + parseFloat(o.total_amount || 0), 0);
+    return {
+      myOrders: mine.length,
+      myPending: mine.filter((o) => o.status === 'pending').length,
+      myCompleted: mine.filter((o) => o.status === 'completed').length,
+      myRevenue,
+      myTotalAmount,
+    };
+  }, [recentOrders, allPayments, user]);
+
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
-  const [recentOrders, setRecentOrders] = useState([]);
   const [cashierOrdersPage, setCashierOrdersPage] = useState(1);
-  // Real data for ordering
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
 
   // Restore modal state from sessionStorage on mount
   const savedModal = () => {
@@ -47,9 +84,16 @@ export default function CashierDashboard() {
   const [orderStep, setOrderStep] = useState(_saved?.orderStep ?? 1);
   const [submitting, setSubmitting] = useState(false);
 
-  // Payment & discount state
-  const [paymentMethods, setPaymentMethods] = useState([]);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(_saved?.selectedPaymentMethod ?? null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(
+    _saved?.selectedPaymentMethod ?? (ctxPaymentMethods[0]?.id ?? null)
+  );
+
+  // Auto-select first payment method once ctxPaymentMethods loads
+  useEffect(() => {
+    if (!selectedPaymentMethod && ctxPaymentMethods.length > 0) {
+      setSelectedPaymentMethod(ctxPaymentMethods[0].id);
+    }
+  }, [ctxPaymentMethods]); // eslint-disable-line react-hooks/exhaustive-deps
   const [discountType, setDiscountType] = useState(_saved?.discountType ?? 'none'); // none | senior | pwd
   const [amountPaid, setAmountPaid] = useState(_saved?.amountPaid ?? '');
   const [receiptData, setReceiptData] = useState(null);
@@ -73,79 +117,14 @@ export default function CashierDashboard() {
     }
   }, [orderModalOpen, cart, orderType, menuCategory, orderStep, selectedPaymentMethod, discountType, amountPaid]);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [orders, payments, prods, cats] = await Promise.all([
-        orderService.getAll(),
-        paymentService.getAll(),
-        productService.getAll(),
-        categoryService.getAll(),
-      ]);
-
-      const mine = orders.filter((o) => o.user_id === user?.id);
-      const myPayments = payments.filter((p) => p.processed_by === user?.id && p.status === 'paid');
-      const myRevenue = myPayments.reduce((sum, p) => sum + parseFloat(p.amount_paid || 0), 0);
-      const myTotalAmount = mine.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
-
-      setStats({
-        myOrders: mine.length,
-        myPending: mine.filter((o) => o.status === 'pending').length,
-        myCompleted: mine.filter((o) => o.status === 'completed').length,
-        myRevenue,
-        myTotalAmount,
-      });
-
-      setRecentOrders(mine);
-      setProducts(prods.filter((p) => p.is_available !== false));
-      setCategories(cats.filter((c) => c.is_active !== false));
-    } catch (err) {
-      console.error('Failed to load cashier dashboard data', err);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+  // ── remove old fetchData + polling block ──
+  // Data is provided by DataContext – no local fetch needed.
 
   // Cart helpers
-  const refreshMenu = async () => {
-    try {
-      const [prods, cats] = await Promise.all([
-        productService.getAll(),
-        categoryService.getAll(),
-      ]);
-      setProducts(prods.filter((p) => p.is_available !== false));
-      setCategories(cats.filter((c) => c.is_active !== false));
-    } catch (err) {
-      console.error('Failed to refresh menu', err);
-    }
-  };
-
-  const loadPaymentMethods = async () => {
-    try {
-      const methods = await paymentService.getMethods();
-      setPaymentMethods(methods);
-      if (methods.length > 0 && !selectedPaymentMethod) setSelectedPaymentMethod(methods[0].id);
-    } catch (err) {
-      console.error('Failed to load payment methods', err);
-    }
-  };
-
-  const openOrderModal = async () => {
+  const openOrderModal = () => {
     setOrderModalOpen(true);
-    refreshMenu();
-    loadPaymentMethods();
+    // Data is already in DataContext cache – no fetch needed
   };
-
-  // On mount, if modal was restored from session, reload products + payment methods
-  useEffect(() => {
-    if (_saved?.open) {
-      refreshMenu();
-      loadPaymentMethods();
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addToCart = (product) => {
     const existing = cart.find((c) => c.product_id === product.id);
@@ -208,15 +187,10 @@ export default function CashierDashboard() {
       const receipt = await orderService.getReceipt(newOrder.id);
       setReceiptData(receipt);
 
-      // Update dashboard stats
-      setRecentOrders((prev) => [newOrder, ...prev]);
-      setStats((prev) => ({
-        ...prev,
-        myOrders: prev.myOrders + 1,
-        myPending: prev.myPending + 1,
-        myRevenue: prev.myRevenue + parseFloat(amountPaid),
-        myTotalAmount: prev.myTotalAmount + finalTotal,
-      }));
+      // Push new order into global cache immediately
+      prependOrder(newOrder);
+      refreshOrders().catch(() => {});
+      refreshPayments().catch(() => {});
 
       // Go to receipt step
       setOrderStep(4);
@@ -253,11 +227,14 @@ export default function CashierDashboard() {
   const handleOrderStatus = async (orderId, status) => {
     if (updatingOrderId) return;
     setUpdatingOrderId(orderId);
+    // Optimistic update
+    ctxSetOrderStatus(orderId, status);
     try {
       await orderService.update(orderId, { status });
-      await fetchData();
+      refreshOrders().catch(() => {});
     } catch (err) {
       console.error('Failed to update order status', err);
+      refreshOrders().catch(() => {});
       alert(err.response?.data?.message || 'Failed to update order status');
     } finally {
       setUpdatingOrderId(null);

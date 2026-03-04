@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
-import { orderService, productService, categoryService, userService, paymentService } from '../../api';
+import { useData } from '../../context/DataContext';
+import { orderService, paymentService } from '../../api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiFileText, FiDollarSign,
@@ -42,18 +43,47 @@ export default function OwnerDashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  /* data */
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [recentOrders, setRecentOrders] = useState([]);
-  const [allOrders, setAllOrders] = useState([]);
+  /* ── DataContext (shared, pre-loaded cache) ── */
+  const {
+    products,
+    categories,
+    orders,
+    users,
+    payments,
+    paymentMethods: ctxPaymentMethods,
+    refreshOrders,
+    refreshPayments,
+    setOrderStatus: ctxSetOrderStatus,
+    prependOrder,
+  } = useData();
+
+  /* alias for backward-compat with the rest of the component */
+  const recentOrders = orders;
+
+  /* derived stats – recomputed whenever orders / payments / users change */
+  const stats = useMemo(() => {
+    const revenue = payments
+      .filter((p) => p.status === 'paid')
+      .reduce((s, p) => s + parseFloat(p.amount_paid || 0), 0);
+    const totalSales = orders
+      .filter((o) => o.status === 'completed')
+      .reduce((s, o) => s + parseFloat(o.total_amount || 0), 0);
+    return {
+      products: products.length,
+      orders: orders.length,
+      users: users.length,
+      categories: categories.length,
+      revenue,
+      totalSales,
+      pendingOrders:   orders.filter((o) => o.status === 'pending').length,
+      completedOrders: orders.filter((o) => o.status === 'completed').length,
+      cancelledOrders: orders.filter((o) => o.status === 'cancelled').length,
+    };
+  }, [products, categories, orders, users, payments]);
+
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [orderSearch, setOrderSearch] = useState('');
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
-  const [stats, setStats] = useState({
-    products: 0, orders: 0, users: 0, categories: 0,
-    revenue: 0, totalSales: 0, pendingOrders: 0, completedOrders: 0, cancelledOrders: 0,
-  });
 
   /* pagination */
   const [ordersPage, setOrdersPage] = useState(1);
@@ -74,8 +104,12 @@ export default function OwnerDashboard() {
   const [menuCategory, setMenuCategory] = useState(_saved?.menuCategory ?? 'all');
   const [orderStep, setOrderStep] = useState(_saved?.orderStep ?? 1);
   const [submitting, setSubmitting] = useState(false);
-  const [paymentMethods, setPaymentMethods] = useState([]);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(_saved?.selectedPaymentMethod ?? null);
+  // paymentMethods comes from DataContext; keep a local copy only when the
+  // modal is open so we don't depend on a separate async load
+  const paymentMethods = ctxPaymentMethods;
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(
+    _saved?.selectedPaymentMethod ?? (ctxPaymentMethods[0]?.id ?? null)
+  );
   const [discountType, setDiscountType] = useState(_saved?.discountType ?? 'none');
   const [amountPaid, setAmountPaid] = useState(_saved?.amountPaid ?? '');
   const [receiptData, setReceiptData] = useState(null);
@@ -99,73 +133,16 @@ export default function OwnerDashboard() {
     }
   }, [orderModalOpen, cart, orderType, menuCategory, orderStep, selectedPaymentMethod, discountType, amountPaid]);
 
-  /* ── fetch all data ── */
-  const fetchAll = async () => {
-    try {
-      const [prods, orders, users, cats, payments] = await Promise.all([
-        productService.getAll(),
-        orderService.getAll(),
-        userService.getAll(),
-        categoryService.getAll(),
-        paymentService.getAll(),
-      ]);
-
-      const revenue = payments
-        .filter((p) => p.status === 'paid')
-        .reduce((sum, p) => sum + parseFloat(p.amount_paid || 0), 0);
-
-      const totalSales = orders
-        .filter((o) => o.status === 'completed')
-        .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
-
-      setProducts(prods);
-      setCategories(cats);
-      setStats({
-        products: prods.length,
-        orders: orders.length,
-        users: users.length,
-        categories: cats.length,
-        revenue,
-        totalSales,
-        pendingOrders: orders.filter((o) => o.status === 'pending').length,
-        completedOrders: orders.filter((o) => o.status === 'completed').length,
-        cancelledOrders: orders.filter((o) => o.status === 'cancelled').length,
-      });
-      setAllOrders(orders);
-      setRecentOrders(orders);
-    } catch (err) {
-      console.error('Failed to load dashboard data', err);
-    }
-  };
-
+  // Auto-select first payment method once ctxPaymentMethods loads
   useEffect(() => {
-    fetchAll();
-    const interval = setInterval(fetchAll, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  /* if modal was restored from session, reload products + payment methods */
-  useEffect(() => {
-    if (_saved?.open) {
-      loadPaymentMethods();
+    if (!selectedPaymentMethod && ctxPaymentMethods.length > 0) {
+      setSelectedPaymentMethod(ctxPaymentMethods[0].id);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ctxPaymentMethods]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ── Order modal helpers ── */
-  const loadPaymentMethods = async () => {
-    try {
-      const methods = await paymentService.getMethods();
-      setPaymentMethods(methods);
-      if (methods.length > 0 && !selectedPaymentMethod) setSelectedPaymentMethod(methods[0].id);
-    } catch (err) {
-      console.error('Failed to load payment methods', err);
-    }
-  };
-
-  const openOrderModal = async () => {
+  const openOrderModal = () => {
     setOrderModalOpen(true);
-    fetchAll();
-    loadPaymentMethods();
+    // Data is already in DataContext cache – no fetch needed
   };
 
   const addToCart = (product) => {
@@ -221,14 +198,12 @@ export default function OwnerDashboard() {
       });
       const receipt = await orderService.getReceipt(newOrder.id);
       setReceiptData(receipt);
-      setRecentOrders((prev) => [newOrder, ...prev]);
-      setStats((prev) => ({
-        ...prev,
-        orders: prev.orders + 1,
-        pendingOrders: prev.pendingOrders + 1,
-        revenue: prev.revenue + parseFloat(amountPaid),
-        totalSales: prev.totalSales + finalTotal,
-      }));
+      // Optimistically push the new order into the global cache so all pages
+      // see it immediately; the background refresh will fill in relationships.
+      prependOrder(newOrder);
+      // Silently refresh in background to get the full order with payment info
+      refreshOrders().catch(() => {});
+      refreshPayments().catch(() => {});
       setOrderStep(4);
     } catch (err) {
       console.error('Failed to create order', err);
@@ -262,11 +237,16 @@ export default function OwnerDashboard() {
   const handleOrderStatus = async (orderId, status) => {
     if (updatingOrderId) return;
     setUpdatingOrderId(orderId);
+    // Optimistic update – change reflected instantly
+    ctxSetOrderStatus(orderId, status);
     try {
       await orderService.update(orderId, { status });
-      await fetchAll();
+      // Background refresh to sync any server-side changes
+      refreshOrders().catch(() => {});
     } catch (err) {
       console.error('Failed to update order status', err);
+      // Roll back optimistic update
+      refreshOrders().catch(() => {});
       alert(err.response?.data?.message || 'Failed to update order status');
     } finally {
       setUpdatingOrderId(null);

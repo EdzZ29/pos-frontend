@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { orderService, paymentService } from '../../api';
+import { useState, useMemo, useCallback } from 'react';
 import { useSettings } from '../../context/SettingsContext';
+import { useData } from '../../context/DataContext';
 import { motion } from 'framer-motion';
 import {
   FiCalendar, FiDollarSign, FiFileText, FiTrendingUp,
@@ -35,6 +35,11 @@ const StatCard = ({ icon, label, value, color, sub }) => {
    ═════════════════════════════════════ */
 export default function ReportsPage() {
   const { gold, goldRgb, isDark, t, panelBg, panelBorder, inputStyle } = useSettings();
+  const { orders, payments, loading, refreshOrders, refreshPayments } = useData();
+  const handleManualRefresh = useCallback(async () => {
+    await Promise.all([refreshOrders(), refreshPayments()]);
+  }, [refreshOrders, refreshPayments]);
+  const lastRefresh = useMemo(() => new Date(), [orders]);
   const customTooltipStyle = {
     background: isDark ? '#1a1a1a' : '#fff',
     border: `1px solid ${t.inputBorder}`,
@@ -44,35 +49,11 @@ export default function ReportsPage() {
     padding: '8px 12px',
   };
   const CHART_COLORS = [gold, '#60a5fa', '#34d399', '#f472b6', '#a78bfa', '#fbbf24', '#f87171'];
-  const [orders, setOrders] = useState([]);
-  const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('daily'); // daily | weekly | monthly | yearly | specific
   const [specificDate, setSpecificDate] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [breakdownPage, setBreakdownPage] = useState(1);
-  const [lastRefresh, setLastRefresh] = useState(new Date());
-
-  const fetchData = useCallback(async () => {
-    try {
-      const [o, p] = await Promise.all([orderService.getAll(), paymentService.getAll()]);
-      setOrders(o);
-      setPayments(p);
-      setLastRefresh(new Date());
-    } catch (err) {
-      console.error('Failed to load reports data', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Initial fetch + auto-refresh every 30 seconds
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
 
   /* ══════ date helpers ══════ */
   const now = useMemo(() => new Date(), [lastRefresh]);
@@ -356,7 +337,7 @@ export default function ReportsPage() {
             Last updated: {lastRefresh.toLocaleTimeString()}
           </span>
           <button
-            onClick={fetchData}
+            onClick={handleManualRefresh}
             className={`p-2 rounded-lg transition ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
             style={{ color: gold, border: `1px solid rgba(${goldRgb},0.2)` }}
             title="Refresh data"

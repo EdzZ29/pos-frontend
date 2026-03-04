@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { timeLogService, userService } from '../../api';
+import { timeLogService } from '../../api';
 import { useSettings } from '../../context/SettingsContext';
+import { useData } from '../../context/DataContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -12,11 +13,12 @@ import defaultLogo from '../../assets/logo.jpg';
 
 export default function AttendancePage() {
   const { gold, goldDark, goldRgb, logoUrl, isDark, t, panelBg, panelBorder, inputStyle } = useSettings();
+  const { users, timeLogs, loading, refreshTimeLogs } = useData();
   const logo = logoUrl || defaultLogo;
-  const [users, setUsers] = useState([]);
-  const [timeLogs, setTimeLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(new Date());
+
+  // Track refresh timestamp when timeLogs update
+  useEffect(() => { setLastRefresh(new Date()); }, [timeLogs]);
 
   /* tabs: qr-cards | scanner */
   const [activeTab, setActiveTab] = useState('qr-cards');
@@ -35,28 +37,8 @@ export default function AttendancePage() {
   const [previewUser, setPreviewUser] = useState(null);
 
   /* fetch data */
-  const fetchData = useCallback(async () => {
-    try {
-      const [usrs, logs] = await Promise.all([
-        userService.getAll(),
-        timeLogService.getAll(),
-      ]);
-      if (!mountedRef.current) return;
-      setUsers(usrs);
-      setTimeLogs(logs);
-      setLastRefresh(new Date());
-    } catch (err) {
-      console.error('Failed to load attendance data', err);
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+  // Data is provided by DataContext – no local fetch needed.
+  // After mutations we call refreshTimeLogs().
 
   /* helper: check if user has active shift */
   const getActiveShift = (userId) => timeLogs.find((l) => l.user_id === userId && l.status === 'active');
@@ -224,7 +206,7 @@ export default function AttendancePage() {
       if (!mountedRef.current) return;
       playBeep();
       setScanResult(result);
-      fetchData();
+      refreshTimeLogs();
     } catch (err) {
       if (!mountedRef.current) return;
       if (err.response?.data?.message) {

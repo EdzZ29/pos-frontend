@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { productService, categoryService } from '../../api';
 import { useSettings } from '../../context/SettingsContext';
+import { useData } from '../../context/DataContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiPlus, FiEdit2, FiTrash2, FiX, FiPackage, FiTag,
@@ -8,8 +9,10 @@ import {
 
 export default function ProductsCategoriesPage() {
   const { gold, goldDark, isDark, t, panelBg, panelBorder, inputStyle } = useSettings();
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const {
+    products, categories,
+    refreshProducts, refreshCategories,
+  } = useData();
 
   /* tab */
   const [activeTab, setActiveTab] = useState('products'); // products | categories
@@ -35,20 +38,8 @@ export default function ProductsCategoriesPage() {
   const CATS_PER_PAGE = 9;
 
   /* ── fetch data ── */
-  const fetchAll = async () => {
-    try {
-      const [prods, cats] = await Promise.all([
-        productService.getAll(),
-        categoryService.getAll(),
-      ]);
-      setProducts(prods);
-      setCategories(cats);
-    } catch (err) {
-      console.error('Failed to load products/categories', err);
-    }
-  };
-
-  useEffect(() => { fetchAll(); }, []);
+  // Data is provided by DataContext – no local fetch needed.
+  // After mutations we call refreshProducts / refreshCategories.
 
   /* ── Product CRUD ── */
   const openAddProduct = () => {
@@ -79,12 +70,11 @@ export default function ProductsCategoriesPage() {
         category_id: parseInt(productForm.category_id),
       };
       if (editingProduct) {
-        const updated = await productService.update(editingProduct.id, payload);
-        setProducts((prev) => prev.map((p) => (p.id === editingProduct.id ? { ...p, ...updated } : p)));
+        await productService.update(editingProduct.id, payload);
       } else {
-        const created = await productService.create(payload);
-        setProducts((prev) => [created, ...prev]);
+        await productService.create(payload);
       }
+      await refreshProducts();
       setShowProductModal(false);
     } catch (err) {
       console.error(err);
@@ -97,7 +87,7 @@ export default function ProductsCategoriesPage() {
     if (!confirm('Delete this product?')) return;
     try {
       await productService.delete(id);
-      setProducts((prev) => prev.filter((p) => p.id !== id));
+      await refreshProducts();
     } catch (err) {
       alert('Failed to delete product');
     }
@@ -119,12 +109,11 @@ export default function ProductsCategoriesPage() {
     setCategorySaving(true);
     try {
       if (editingCategory) {
-        const updated = await categoryService.update(editingCategory.id, categoryForm);
-        setCategories((prev) => prev.map((c) => (c.id === editingCategory.id ? { ...c, ...updated } : c)));
+        await categoryService.update(editingCategory.id, categoryForm);
       } else {
-        const created = await categoryService.create(categoryForm);
-        setCategories((prev) => [created, ...prev]);
+        await categoryService.create(categoryForm);
       }
+      await refreshCategories();
       setShowCategoryModal(false);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to save category');
@@ -136,7 +125,7 @@ export default function ProductsCategoriesPage() {
     if (!confirm('Delete this category? Products under it may become orphaned.')) return;
     try {
       await categoryService.delete(id);
-      setCategories((prev) => prev.filter((c) => c.id !== id));
+      await refreshCategories();
     } catch (err) {
       alert('Failed to delete category');
     }

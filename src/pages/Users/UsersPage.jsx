@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { userService, roleService } from '../../api';
+import React, { useState } from 'react';
+import { userService } from '../../api';
 import { useSettings } from '../../context/SettingsContext';
+import { useData } from '../../context/DataContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiUsers, FiSearch, FiEdit2, FiSlash, FiCheckCircle,
@@ -63,11 +64,9 @@ const StatCard = ({ icon, label, value, color }) => {
    ═══════════════════════════════════════ */
 export default function UsersPage() {
   const { gold, goldDark, goldRgb, isDark, t, panelBg, panelBorder, inputStyle } = useSettings();
-  const [users, setUsers] = useState([]);
-  const [roles, setRoles] = useState([]);
+  const { users, roles, loading, refreshUsers } = useData();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [loading, setLoading] = useState(true);
 
   /* Edit Modal state */
   const [showModal, setShowModal] = useState(false);
@@ -86,19 +85,8 @@ export default function UsersPage() {
   const [showRegConfirm, setShowRegConfirm] = useState(false);
 
   /* Fetch data */
-  const fetchData = async () => {
-    try {
-      const [u, r] = await Promise.all([userService.getAll(), roleService.getAll()]);
-      setUsers(u);
-      setRoles(r);
-    } catch (err) {
-      console.error('Failed to load users', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchData(); }, []);
+  // Data is provided by DataContext – no local fetch needed.
+  // After mutations we call refreshUsers().
 
   /* Derived stats */
   const activeCount = users.filter((u) => u.is_active).length;
@@ -150,7 +138,7 @@ export default function UsersPage() {
       };
       if (form.password) payload.password = form.password;
       await userService.update(editingUser.id, payload);
-      await fetchData();
+      await refreshUsers();
       closeModal();
     } catch (err) {
       console.error('Failed to update user', err);
@@ -199,7 +187,7 @@ export default function UsersPage() {
         role_id: parseInt(regForm.role_id),
       };
       await userService.create(payload);
-      await fetchData();
+      await refreshUsers();
       closeRegister();
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data?.errors
@@ -215,7 +203,7 @@ export default function UsersPage() {
   const toggleBlock = async (user) => {
     try {
       await userService.update(user.id, { is_active: !user.is_active });
-      await fetchData();
+      await refreshUsers();
     } catch (err) {
       console.error('Failed to toggle user status', err);
       alert(err.response?.data?.message || 'Failed to update status.');
