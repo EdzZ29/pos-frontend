@@ -301,7 +301,7 @@ export default function AttendancePage() {
           <span className="text-[10px]" style={{ color: t.textFaint }}>
             Last updated: {lastRefresh.toLocaleTimeString()}
           </span>
-          <button onClick={fetchData}
+          <button onClick={refreshTimeLogs}
             className={`p-2 rounded-lg transition ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
             style={{ color: gold, border: `1px solid rgba(${goldRgb},0.2)` }} title="Refresh">
             <FiRefreshCw size={14} />

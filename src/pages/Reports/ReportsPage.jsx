@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSettings } from '../../context/SettingsContext';
 import { useData } from '../../context/DataContext';
 import { motion } from 'framer-motion';
@@ -54,8 +54,7 @@ export default function ReportsPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [breakdownPage, setBreakdownPage] = useState(1);
-
-  /* ══════ date helpers ══════ */
+  const BREAKDOWN_PER_PAGE = 8;
   const now = useMemo(() => new Date(), [lastRefresh]);
 
   const isToday = (d) => {
@@ -104,31 +103,54 @@ export default function ReportsPage() {
   const filteredOrders  = useMemo(() => orders.filter((o) => matchesPeriod(o.created_at)), [orders, period, specificDate, selectedMonth, selectedYear, lastRefresh]);
   const filteredPayments = useMemo(() => payments.filter((p) => matchesPeriod(p.created_at)), [payments, period, specificDate, selectedMonth, selectedYear, lastRefresh]);
 
-  const completedOrders = filteredOrders.filter((o) => o.status === 'completed');
-  const pendingOrders   = filteredOrders.filter((o) => o.status === 'pending');
-  const cancelledOrders = filteredOrders.filter((o) => o.status === 'cancelled');
+  const completedOrders = useMemo(() => filteredOrders.filter((o) => o.status === 'completed'), [filteredOrders]);
+  const pendingOrders   = useMemo(() => filteredOrders.filter((o) => o.status === 'pending'),   [filteredOrders]);
+  const preparingOrders = useMemo(() => filteredOrders.filter((o) => o.status === 'preparing'), [filteredOrders]);
+  const cancelledOrders = useMemo(() => filteredOrders.filter((o) => o.status === 'cancelled'), [filteredOrders]);
+  const servedOrders    = useMemo(() => filteredOrders.filter((o) => o.status === 'served'),    [filteredOrders]);
 
-  const totalRevenue = filteredPayments
-    .filter((p) => p.status === 'paid')
-    .reduce((s, p) => s + parseFloat(p.amount_paid || 0), 0);
+  /**
+   * paidOrders = orders that have had money collected (payment.status==='paid') OR
+   * are explicitly marked completed. This is the source of truth for all financial
+   * charts because the PaymentController does NOT auto-complete orders on payment.
+   */
+  const paidOrders = useMemo(() =>
+    filteredOrders.filter((o) =>
+      o.status !== 'cancelled' &&
+      (o.status === 'completed' || o.status === 'served' || o.payment?.status === 'paid')
+    ), [filteredOrders]);
 
-  const totalSales = completedOrders
-    .reduce((s, o) => s + parseFloat(o.total_amount || 0), 0);
+  // Total revenue = sum of (order total_amount) for paid payments
+  // We use order.total_amount (not amount_paid) to exclude the change given back to customer.
+  const totalRevenue = useMemo(() =>
+    filteredPayments
+      .filter((p) => p.status === 'paid')
+      .reduce((s, p) => s + parseFloat(p.order?.total_amount ?? p.amount_paid ?? 0), 0),
+    [filteredPayments]);
 
-  const totalProductsSold = completedOrders
-    .reduce((s, o) => s + (o.items || []).reduce((a, i) => a + (i.quantity || 0), 0), 0);
+  const totalSales = useMemo(() =>
+    paidOrders.reduce((s, o) => s + parseFloat(o.total_amount || 0), 0),
+    [paidOrders]);
 
-  const avgOrderValue = completedOrders.length > 0 ? totalSales / completedOrders.length : 0;
+  const totalProductsSold = useMemo(() =>
+    paidOrders.reduce((s, o) => s + (o.items || []).reduce((a, i) => a + (i.quantity || 0), 0), 0),
+    [paidOrders]);
+
+  const avgOrderValue = useMemo(() =>
+    paidOrders.length > 0 ? totalSales / paidOrders.length : 0,
+    [paidOrders, totalSales]);
 
   /* ══════ chart data builders ══════ */
 
-  /* Revenue over time (area chart) — for specific date or daily, show hourly */
+  /* Revenue over time (area chart) — built from paid PAYMENTS so it always shows
+     data when money has been collected, regardless of order status. */
   const revenueOverTime = useMemo(() => {
     const map = {};
     const useHourly = period === 'daily' || period === 'specific';
+    const paidPayments = filteredPayments.filter((p) => p.status === 'paid');
 
-    completedOrders.forEach((o) => {
-      const dt = new Date(o.created_at);
+    paidPayments.forEach((p) => {
+      const dt = new Date(p.created_at);
       let key, sortKey;
       if (useHourly) {
         const hour = dt.getHours();
@@ -147,46 +169,49 @@ export default function ReportsPage() {
         sortKey = dt.getMonth();
       }
       if (!map[key]) map[key] = { name: key, revenue: 0, orders: 0, _sort: sortKey };
-      map[key].revenue += parseFloat(o.total_amount || 0);
+      // Use order's total_amount (actual sale) instead of amount_paid (could include overpayment)
+      map[key].revenue += parseFloat(p.order?.total_amount ?? p.amount_paid ?? 0);
       map[key].orders += 1;
     });
 
     return Object.values(map).sort((a, b) => a._sort - b._sort);
-  }, [completedOrders, period]);
+  }, [filteredPayments, period]);
 
   /* Order status distribution (pie chart) */
   const statusDistribution = useMemo(() => {
     const data = [];
-    if (completedOrders.length > 0) data.push({ name: 'Completed', value: completedOrders.length, color: '#34d399' });
-    if (pendingOrders.length > 0)   data.push({ name: 'Pending', value: pendingOrders.length, color: '#fbbf24' });
-    if (cancelledOrders.length > 0) data.push({ name: 'Cancelled', value: cancelledOrders.length, color: '#f87171' });
+    if (completedOrders.length > 0)  data.push({ name: 'Completed',  value: completedOrders.length,  color: '#34d399' });
+    if (servedOrders.length > 0)     data.push({ name: 'Served',     value: servedOrders.length,     color: '#22d3ee' });
+    if (preparingOrders.length > 0)  data.push({ name: 'Preparing',  value: preparingOrders.length,  color: '#60a5fa' });
+    if (pendingOrders.length > 0)    data.push({ name: 'Pending',    value: pendingOrders.length,    color: '#fbbf24' });
+    if (cancelledOrders.length > 0)  data.push({ name: 'Cancelled',  value: cancelledOrders.length,  color: '#f87171' });
     return data;
-  }, [completedOrders, pendingOrders, cancelledOrders]);
+  }, [completedOrders, servedOrders, preparingOrders, pendingOrders, cancelledOrders]);
 
-  /* Payment methods breakdown (pie) */
+  /* Payment methods breakdown (pie) — use order total_amount (net of change) */
   const paymentMethodBreakdown = useMemo(() => {
     const map = {};
     filteredPayments.filter((p) => p.status === 'paid').forEach((p) => {
       const name = p.method?.name || p.payment_method?.name || 'Unknown';
       if (!map[name]) map[name] = { name, value: 0 };
-      map[name].value += parseFloat(p.amount_paid || 0);
+      map[name].value += parseFloat(p.order?.total_amount ?? p.amount_paid ?? 0);
     });
     return Object.values(map);
   }, [filteredPayments]);
 
-  /* Top selling products (bar chart) */
+  /* Top selling products (bar chart) — use paidOrders so data shows for all paid transactions */
   const topProducts = useMemo(() => {
     const map = {};
-    completedOrders.forEach((o) => {
+    paidOrders.forEach((o) => {
       (o.items || []).forEach((item) => {
         const name = item.product?.name || `Product #${item.product_id}`;
         if (!map[name]) map[name] = { name, qty: 0, revenue: 0 };
-        map[name].qty += item.quantity;
-        map[name].revenue += parseFloat(item.subtotal || item.unit_price * item.quantity || 0);
+        map[name].qty += item.quantity || 0;
+        map[name].revenue += parseFloat(item.subtotal || (item.unit_price * item.quantity) || 0);
       });
     });
     return Object.values(map).sort((a, b) => b.qty - a.qty).slice(0, 8);
-  }, [completedOrders]);
+  }, [paidOrders]);
 
   /* Hourly / daily breakdown table */
   const dailyBreakdown = useMemo(() => {
@@ -202,7 +227,7 @@ export default function ReportsPage() {
       }
       if (!map[key]) map[key] = { time: key, orders: 0, revenue: 0, items: 0 };
       map[key].orders += 1;
-      if (o.status === 'completed') {
+      if (o.status !== 'cancelled' && (o.status === 'completed' || o.status === 'served' || o.payment?.status === 'paid')) {
         map[key].revenue += parseFloat(o.total_amount || 0);
         map[key].items += (o.items || []).reduce((a, i) => a + (i.quantity || 0), 0);
       }
@@ -214,22 +239,22 @@ export default function ReportsPage() {
   const TAX_RATE = 0.12; // 12% VAT
 
   const taxData = useMemo(() => {
-    const grossSales = completedOrders.reduce((s, o) => s + parseFloat(o.total_amount || 0), 0);
-    const totalDiscount = completedOrders.reduce((s, o) => s + parseFloat(o.discount_amount || 0), 0);
+    const grossSales = paidOrders.reduce((s, o) => s + parseFloat(o.total_amount || 0), 0);
+    const totalDiscount = paidOrders.reduce((s, o) => s + parseFloat(o.discount_amount || 0), 0);
     const netSales = grossSales;
     const vatableSales = netSales / (1 + TAX_RATE);
     const vatAmount = netSales - vatableSales;
-    const vatExemptSales = completedOrders
+    const vatExemptSales = paidOrders
       .filter((o) => o.discount_type === 'senior' || o.discount_type === 'pwd')
       .reduce((s, o) => s + parseFloat(o.total_amount || 0), 0);
     return { grossSales, totalDiscount, netSales, vatableSales, vatAmount, vatExemptSales };
-  }, [completedOrders]);
+  }, [paidOrders]);
 
   /* Tax breakdown over time for chart */
   const taxOverTime = useMemo(() => {
     const map = {};
     const useHourly = period === 'daily' || period === 'specific';
-    completedOrders.forEach((o) => {
+    paidOrders.forEach((o) => {
       const dt = new Date(o.created_at);
       let key, sortKey;
       if (useHourly) {
@@ -256,13 +281,17 @@ export default function ReportsPage() {
       map[key].tax += vat;
     });
     return Object.values(map).sort((a, b) => a._sort - b._sort);
-  }, [completedOrders, period]);
+  }, [paidOrders, period]);
 
   /* ══════ Revenue Trends Data ══════ */
   const revenueTrends = useMemo(() => {
     // Always show monthly data for the selected year (or this year)
     const targetYear = selectedYear;
-    const allCompleted = orders.filter((o) => o.status === 'completed');
+    // Include all paid orders (not just explicitly 'completed') so the trend chart is populated
+    const allPaid = orders.filter((o) =>
+      o.status !== 'cancelled' &&
+      (o.status === 'completed' || o.status === 'served' || o.payment?.status === 'paid')
+    );
     const months = Array.from({ length: 12 }, (_, i) => ({
       name: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][i],
       month: i,
@@ -270,7 +299,7 @@ export default function ReportsPage() {
       orders: 0,
       avgOrder: 0,
     }));
-    allCompleted.forEach((o) => {
+    allPaid.forEach((o) => {
       const dt = new Date(o.created_at);
       if (dt.getFullYear() === targetYear) {
         const m = dt.getMonth();
@@ -300,12 +329,6 @@ export default function ReportsPage() {
     return Array.from(years).sort((a, b) => b - a);
   }, [orders]);
 
-  const BREAKDOWN_PER_PAGE = 10;
-  const totalBreakdownPages = Math.max(1, Math.ceil(dailyBreakdown.length / BREAKDOWN_PER_PAGE));
-  const paginatedBreakdown = dailyBreakdown.slice((breakdownPage - 1) * BREAKDOWN_PER_PAGE, breakdownPage * BREAKDOWN_PER_PAGE);
-
-  useEffect(() => { setBreakdownPage(1); }, [period, selectedMonth, selectedYear, specificDate]);
-
   const periodLabels = {
     daily: "Today's",
     weekly: "This Week's",
@@ -320,6 +343,9 @@ export default function ReportsPage() {
     : periodLabels[period];
 
   const breakdownLabel = (period === 'daily' || period === 'specific') ? 'Hourly' : 'Daily';
+  const totalBreakdownPages = Math.max(1, Math.ceil(dailyBreakdown.length / BREAKDOWN_PER_PAGE));
+  const paginatedBreakdown = dailyBreakdown.slice((breakdownPage - 1) * BREAKDOWN_PER_PAGE, breakdownPage * BREAKDOWN_PER_PAGE);
+  useEffect(() => { setBreakdownPage(1); }, [period, selectedMonth, selectedYear, specificDate]);
 
   return (
     <div className="p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
@@ -489,42 +515,74 @@ export default function ReportsPage() {
               )}
             </motion.div>
 
-            {/* Order Status Distribution — Pie chart */}
+            {/* Hourly / Daily Breakdown — compact table */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              className="rounded-xl p-5" style={{ background: panelBg, border: panelBorder }}>
-              <h3 className="text-sm font-semibold mb-4" style={{ color: t.textPrimary }}>Order Status</h3>
-              {statusDistribution.length === 0 ? (
-                <div className="flex items-center justify-center h-64 text-sm" style={{ color: t.textFaint }}>
-                  No orders.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={260}>
-                  <PieChart>
-                    <Pie
-                      data={statusDistribution}
-                      cx="50%" cy="50%"
-                      innerRadius={55} outerRadius={90}
-                      paddingAngle={4}
-                      dataKey="value"
-                      stroke="none"
-                    >
-                      {statusDistribution.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
+              className="rounded-xl overflow-hidden flex flex-col" style={{ background: panelBg, border: panelBorder }}>
+              <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: panelBorder }}>
+                <h3 className="text-sm font-semibold" style={{ color: t.textPrimary }}>
+                  {breakdownLabel} Breakdown
+                  <span className="ml-2 text-[10px] uppercase tracking-wider px-2 py-1 rounded-md"
+                    style={{ background: `rgba(${goldRgb},0.12)`, color: gold }}>
+                    {dailyBreakdown.length} entries
+                  </span>
+                </h3>
+              </div>
+              <div className="overflow-y-auto flex-1 min-h-0">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0" style={{ background: isDark ? '#0d0d0d' : '#f4f5f7' }}>
+                    <tr style={{ borderBottom: panelBorder }}>
+                      {[(period === 'daily' || period === 'specific') ? 'Time' : 'Date', 'Orders', 'Revenue'].map((h) => (
+                        <th key={h} className="px-4 py-2 text-left text-[10px] uppercase tracking-wider font-semibold"
+                          style={{ color: t.textFaint }}>{h}</th>
                       ))}
-                    </Pie>
-                    <Tooltip contentStyle={customTooltipStyle} />
-                    <Legend wrapperStyle={{ color: t.textSecondary, fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dailyBreakdown.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-8 text-center text-xs" style={{ color: t.textFaint }}>
+                          No data for this period.
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedBreakdown.map((row, i) => (
+                        <tr key={i} style={{ borderBottom: `1px solid ${t.tableBg}` }}
+                          className={`${isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-black/[0.02]'} transition`}>
+                          <td className="px-4 py-2 font-medium" style={{ color: t.textPrimary }}>{row.time}</td>
+                          <td className="px-4 py-2">
+                            <span className="font-bold px-1.5 py-0.5 rounded"
+                              style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa' }}>{row.orders}</span>
+                          </td>
+                          <td className="px-4 py-2 font-semibold" style={{ color: gold }}>{fmt(row.revenue)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {totalBreakdownPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-2 flex-shrink-0" style={{ borderTop: panelBorder }}>
+                  <span className="text-[10px]" style={{ color: t.textMuted }}>
+                    {breakdownPage} / {totalBreakdownPages}
+                  </span>
+                  <div className="flex gap-1">
+                    <button onClick={() => setBreakdownPage((p) => Math.max(1, p - 1))} disabled={breakdownPage === 1}
+                      className="px-2.5 py-1 rounded-md text-[10px] font-medium transition disabled:opacity-30"
+                      style={{ background: t.divider, color: t.textPrimary }}>← Prev</button>
+                    <button onClick={() => setBreakdownPage((p) => Math.min(totalBreakdownPages, p + 1))} disabled={breakdownPage === totalBreakdownPages}
+                      className="px-2.5 py-1 rounded-md text-[10px] font-medium transition disabled:opacity-30"
+                      style={{ background: t.divider, color: t.textPrimary }}>Next →</button>
+                  </div>
+                </div>
               )}
             </motion.div>
           </div>
 
-          {/* ─── Charts Row 2: Top Products + Payment Methods ─── */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          {/* ─── Charts Row 2: Top Products ─── */}
+          <div className="grid grid-cols-1 gap-6 mb-6">
             {/* Top Products — Bar chart */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              className="lg:col-span-2 rounded-xl p-5" style={{ background: panelBg, border: panelBorder }}>
+              className="rounded-xl p-5" style={{ background: panelBg, border: panelBorder }}>
               <h3 className="text-sm font-semibold mb-4" style={{ color: t.textPrimary }}>Top Selling Products</h3>
               {topProducts.length === 0 ? (
                 <div className="flex items-center justify-center h-64 text-sm" style={{ color: t.textFaint }}>
@@ -545,35 +603,6 @@ export default function ReportsPage() {
               )}
             </motion.div>
 
-            {/* Payment Methods — Pie */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              className="rounded-xl p-5" style={{ background: panelBg, border: panelBorder }}>
-              <h3 className="text-sm font-semibold mb-4" style={{ color: t.textPrimary }}>Payment Methods</h3>
-              {paymentMethodBreakdown.length === 0 ? (
-                <div className="flex items-center justify-center h-64 text-sm" style={{ color: t.textFaint }}>
-                  No payments.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={260}>
-                  <PieChart>
-                    <Pie
-                      data={paymentMethodBreakdown}
-                      cx="50%" cy="50%"
-                      innerRadius={55} outerRadius={90}
-                      paddingAngle={4}
-                      dataKey="value"
-                      stroke="none"
-                    >
-                      {paymentMethodBreakdown.map((_, i) => (
-                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={customTooltipStyle} formatter={(v) => fmt(v)} />
-                    <Legend wrapperStyle={{ color: t.textSecondary, fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
-            </motion.div>
           </div>
 
           {/* ─── Tax Report Section ─── */}
@@ -706,84 +735,6 @@ export default function ReportsPage() {
             </motion.div>
           </div>
 
-          {/* ─── Period Breakdown Table ─── */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="rounded-xl overflow-hidden mb-6" style={{ background: panelBg, border: panelBorder }}>
-            <div className="px-5 py-4" style={{ borderBottom: panelBorder }}>
-              <h3 className="text-sm font-semibold" style={{ color: t.textPrimary }}>
-                {breakdownLabel} Breakdown
-                <span className="ml-2 text-[10px] uppercase tracking-wider px-2 py-1 rounded-md"
-                  style={{ background: `rgba(${goldRgb},0.12)`, color: gold }}>
-                  {dailyBreakdown.length} entries
-                </span>
-              </h3>
-            </div>
-            <div className="overflow-x-auto" style={{ maxHeight: '360px', overflowY: 'auto' }}>
-              <table className="w-full text-sm">
-                <thead className="sticky top-0" style={{ background: isDark ? '#0d0d0d' : '#f4f5f7' }}>
-                  <tr style={{ borderBottom: panelBorder }}>
-                    {[(period === 'daily' || period === 'specific') ? 'Time' : 'Date', 'Orders', 'Items Sold', 'Revenue'].map((h) => (
-                      <th key={h} className="px-5 py-3 text-left text-[11px] uppercase tracking-wider font-semibold"
-                        style={{ color: t.textFaint }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {dailyBreakdown.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-5 py-10 text-center text-sm" style={{ color: t.textFaint }}>
-                        No data for this period.
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedBreakdown.map((row, i) => (
-                      <tr key={i} style={{ borderBottom: `1px solid ${t.tableBg}` }}
-                        className={`${isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-black/[0.02]'} transition`}>
-                        <td className="px-5 py-3 text-xs font-medium" style={{ color: t.textPrimary }}>{row.time}</td>
-                        <td className="px-5 py-3">
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-md"
-                            style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa' }}>
-                            {row.orders}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3">
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-md"
-                            style={{ background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>
-                            {row.items}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3 text-xs font-semibold" style={{ color: gold }}>
-                          {fmt(row.revenue)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {totalBreakdownPages > 1 && (
-              <div className="flex items-center justify-between px-5 py-3" style={{ borderTop: panelBorder }}>
-                <span className="text-xs" style={{ color: t.textMuted }}>
-                  Page {breakdownPage} of {totalBreakdownPages}
-                </span>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setBreakdownPage((p) => Math.max(1, p - 1))} disabled={breakdownPage === 1}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
-                    style={{ background: t.divider, color: t.textPrimary }}>
-                    ← Prev
-                  </button>
-                  <span className="text-xs px-2" style={{ color: t.textSecondary }}>
-                    {breakdownPage} / {totalBreakdownPages}
-                  </span>
-                  <button onClick={() => setBreakdownPage((p) => Math.min(totalBreakdownPages, p + 1))} disabled={breakdownPage === totalBreakdownPages}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-30"
-                    style={{ background: t.divider, color: t.textPrimary }}>
-                    Next →
-                  </button>
-                </div>
-              </div>
-            )}
-          </motion.div>
         </>
       )}
     </div>
