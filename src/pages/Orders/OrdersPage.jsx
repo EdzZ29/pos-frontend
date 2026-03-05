@@ -32,15 +32,15 @@ function StatusBadge({ status }) {
 const StatCard = ({ icon, label, value, color }) => {
   const { t, panelBg, panelBorder } = useSettings();
   return (
-    <div className="rounded-xl p-5 flex items-center gap-4"
+    <div className="rounded-xl p-3 sm:p-5 flex items-center gap-3 sm:gap-4"
       style={{ background: panelBg, border: panelBorder }}>
-      <div className="w-11 h-11 rounded-lg flex items-center justify-center"
+      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center flex-shrink-0"
         style={{ background: `${color}18`, color }}>
         {icon}
       </div>
-      <div>
-        <p className="text-[11px] uppercase tracking-wider" style={{ color: t.textMuted }}>{label}</p>
-        <p className="text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{value}</p>
+      <div className="min-w-0">
+        <p className="text-[10px] sm:text-[11px] uppercase tracking-wider truncate" style={{ color: t.textMuted }}>{label}</p>
+        <p className="text-base sm:text-xl font-bold mt-0.5 truncate" style={{ color: t.textPrimary }}>{value}</p>
       </div>
     </div>
   );
@@ -107,37 +107,37 @@ export default function OrdersPage() {
   });
 
   return (
-    <div className="p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: t.textPrimary }}>Orders</h1>
-        <p className="text-sm mt-1" style={{ color: t.textMuted }}>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold" style={{ color: t.textPrimary }}>Orders</h1>
+        <p className="text-xs sm:text-sm mt-1" style={{ color: t.textMuted }}>
           {isCashier ? 'View and manage your orders.' : 'All orders across the system.'}
         </p>
       </motion.div>
 
       {/* Stat cards */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <StatCard icon={<FiFileText size={20} />} label="Total Orders" value={orders.length} color="#60a5fa" />
-        <StatCard icon={<FiClock size={20} />} label="Pending" value={pendingCount} color="#fbbf24" />
-        <StatCard icon={<FiCheckCircle size={20} />} label="Completed" value={completedCount} color="#34d399" />
-        <StatCard icon={<FiDollarSign size={20} />} label="Revenue"
+        className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-4 mb-4 sm:mb-6">
+        <StatCard icon={<FiFileText size={18} />} label="Total Orders" value={orders.length} color="#60a5fa" />
+        <StatCard icon={<FiClock size={18} />} label="Pending" value={pendingCount} color="#fbbf24" />
+        <StatCard icon={<FiCheckCircle size={18} />} label="Completed" value={completedCount} color="#34d399" />
+        <StatCard icon={<FiDollarSign size={18} />} label="Revenue"
           value={`₱${totalRevenue.toLocaleString('en', { minimumFractionDigits: 2 })}`}
           color={gold} />
         <div
-          className="rounded-xl p-5 flex items-center gap-4 cursor-pointer transition-all hover:brightness-110"
+          className="rounded-xl p-3 sm:p-5 flex items-center gap-3 sm:gap-4 cursor-pointer transition-all hover:brightness-110 col-span-2 lg:col-span-1"
           style={{ background: panelBg, border: panelBorder }}
           onClick={() => setShowProductSales((v) => !v)}
         >
-          <div className="w-11 h-11 rounded-lg flex items-center justify-center"
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center"
             style={{ background: '#a78bfa18', color: '#a78bfa' }}>
-            <FiShoppingBag size={20} />
+            <FiShoppingBag size={18} />
           </div>
           <div className="flex-1">
-            <p className="text-[11px] uppercase tracking-wider" style={{ color: t.textMuted }}>Products Sold</p>
-            <p className="text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{totalProductsSold}</p>
+            <p className="text-[10px] sm:text-[11px] uppercase tracking-wider" style={{ color: t.textMuted }}>Products Sold</p>
+            <p className="text-lg sm:text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{totalProductsSold}</p>
           </div>
           <div style={{ color: t.textFaint }}>
             {showProductSales ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
@@ -205,28 +205,28 @@ export default function OrdersPage() {
 
       {/* Toolbar: search + status filter */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-        className="flex items-center gap-3 mb-5 flex-wrap">
+        className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4 sm:mb-5">
         {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative flex-1 min-w-0 sm:min-w-[200px] sm:max-w-sm">
           <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: t.textFaint }} />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by order #, product, cashier..."
+            placeholder="Search orders..."
             className="w-full pl-9 pr-3 py-2.5 rounded-lg text-xs"
             style={{ background: t.tableBg, border: `1px solid ${t.inputBorder}`, color: t.textPrimary, outline: 'none' }}
           />
         </div>
 
         {/* Status filter pills */}
-        <div className="flex items-center gap-2">
-          <FiFilter size={14} style={{ color: t.textFaint }} />
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0">
+          <FiFilter size={14} className="flex-shrink-0" style={{ color: t.textFaint }} />
           {['all', 'pending', 'preparing', 'completed', 'cancelled'].map((st) => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
-              className="px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all"
+              className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider transition-all flex-shrink-0"
               style={{
                 background: statusFilter === st ? gold : t.tableBg,
                 color: statusFilter === st ? '#000' : t.textSecondary,
@@ -244,8 +244,8 @@ export default function OrdersPage() {
         className="rounded-xl overflow-hidden"
         style={{ background: panelBg, border: panelBorder }}>
 
-        <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto table-responsive" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="sticky top-0 z-10" style={{ background: isDark ? '#0d0d0d' : '#fff' }}>
               <tr style={{ borderBottom: panelBorder }}>
                 {['', 'Order #', ...(isCashier ? [] : ['Cashier']), 'Type', 'Items', 'Discount', 'Total', 'Payment', 'Status', 'Date & Time'].map((h) => (

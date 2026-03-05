@@ -242,28 +242,28 @@ export default function CashierDashboard() {
   };
 
   return (
-    <div className="p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex items-start justify-between">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: t.textPrimary }}>
+          <h1 className="text-xl sm:text-2xl font-bold" style={{ color: t.textPrimary }}>
             Cashier Dashboard
           </h1>
-          <p className="text-sm mt-1" style={{ color: t.textMuted }}>
+          <p className="text-xs sm:text-sm mt-1" style={{ color: t.textMuted }}>
             Welcome back, {user?.name?.split(' ')[0] || 'Cashier'}. Here's your shift overview.
           </p>
         </div>
-        <div className="text-right flex-shrink-0 ml-4">
-          <div className="flex items-center gap-2 justify-end mb-1">
+        <div className="text-left sm:text-right flex-shrink-0">
+          <div className="flex items-center gap-2 sm:justify-end mb-1">
             <FiCalendar size={14} style={{ color: gold }} />
-            <span className="text-sm font-semibold" style={{ color: t.textPrimary }}>
+            <span className="text-xs sm:text-sm font-semibold" style={{ color: t.textPrimary }}>
               {currentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </span>
           </div>
-          <div className="flex items-center gap-2 justify-end">
+          <div className="flex items-center gap-2 sm:justify-end">
             <FiClock size={14} style={{ color: gold }} />
-            <span className="text-lg font-bold tabular-nums" style={{ color: gold }}>
+            <span className="text-base sm:text-lg font-bold tabular-nums" style={{ color: gold }}>
               {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </span>
           </div>
@@ -275,11 +275,11 @@ export default function CashierDashboard() {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
-        className="mb-8"
+        className="mb-6 sm:mb-8"
       >
         <button
           onClick={openOrderModal}
-          className="w-full sm:w-1/2 py-5 px-6 rounded-2xl flex items-center justify-between group transition-all duration-300"
+          className="w-full sm:w-1/2 lg:w-auto lg:min-w-[320px] py-4 sm:py-5 px-4 sm:px-6 rounded-2xl flex items-center justify-between group transition-all duration-300"
           style={{
             background: `linear-gradient(135deg, ${gold}, ${goldDark})`,
             boxShadow: `0 8px 20px rgba(${goldRgb},0.3)`,
@@ -287,55 +287,57 @@ export default function CashierDashboard() {
           onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 12px 28px rgba(${goldRgb},0.45)`; e.currentTarget.style.transform = 'translateY(-2px)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 8px 20px rgba(${goldRgb},0.3)`; e.currentTarget.style.transform = 'translateY(0)'; }}
         >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-              <FiPlus size={24} className="text-white" />
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 rounded-full flex items-center justify-center">
+              <FiPlus size={20} className="text-white sm:hidden" />
+              <FiPlus size={24} className="text-white hidden sm:block" />
             </div>
             <div className="text-left">
-              <span className="text-xl font-bold block text-white">Take New Order</span>
-              <span className="text-white/70 text-sm">Start a new transaction</span>
+              <span className="text-lg sm:text-xl font-bold block text-white">Take New Order</span>
+              <span className="text-white/70 text-xs sm:text-sm">Start a new transaction</span>
             </div>
           </div>
-          <FiArrowRight size={24} className="text-white group-hover:translate-x-1 transition-transform" />
+          <FiArrowRight size={20} className="text-white group-hover:translate-x-1 transition-transform sm:hidden" />
+          <FiArrowRight size={24} className="text-white group-hover:translate-x-1 transition-transform hidden sm:block" />
         </button>
       </motion.div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard icon={<FiFileText size={20} />} label="My Orders" value={stats.myOrders} color="#60a5fa" />
-        <StatCard icon={<FiClock size={20} />} label="Pending" value={stats.myPending} color="#fbbf24" />
-        <StatCard icon={<FiCheckCircle size={20} />} label="Completed" value={stats.myCompleted} color="#34d399" />
-        <StatCard icon={<FiDollarSign size={20} />} label="My Collections"
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-6 sm:mb-8">
+        <StatCard icon={<FiFileText size={18} />} label="My Orders" value={stats.myOrders} color="#60a5fa" />
+        <StatCard icon={<FiClock size={18} />} label="Pending" value={stats.myPending} color="#fbbf24" />
+        <StatCard icon={<FiCheckCircle size={18} />} label="Completed" value={stats.myCompleted} color="#34d399" />
+        <StatCard icon={<FiDollarSign size={18} />} label="My Collections"
           value={`₱${(stats.myTotalAmount || 0).toLocaleString('en', { minimumFractionDigits: 2 })}`}
           color={gold} />
       </div>
 
       {/* ──────────── RECENT ORDERS ──────────── */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-        className="rounded-xl overflow-hidden mb-8" style={{ background: t.cardBg, border: '1px solid ' + t.divider }}>
-        <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid ' + t.divider }}>
-          <h2 className="text-sm font-semibold" style={{ color: t.textPrimary }}>My Recent Orders</h2>
+        className="rounded-xl overflow-hidden mb-6 sm:mb-8" style={{ background: t.cardBg, border: '1px solid ' + t.divider }}>
+        <div className="px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between" style={{ borderBottom: '1px solid ' + t.divider }}>
+          <h2 className="text-xs sm:text-sm font-semibold" style={{ color: t.textPrimary }}>My Recent Orders</h2>
           <span className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-md"
             style={{ background: `rgba(${goldRgb},0.12)`, color: gold }}>
             {recentOrders.length} total
           </span>
         </div>
-        <div className="p-5 space-y-3">
+        <div className="p-3 sm:p-5 space-y-3">
           {paginatedCashierOrders.map((order) => (
-            <div key={order.id} className="rounded-xl p-4"
+            <div key={order.id} className="rounded-xl p-3 sm:p-4"
               style={{ background: t.cardBg, border: '1px solid ' + t.divider }}>
-              <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3 mb-3">
                 <div>
                   <p className="text-[10px] uppercase tracking-wider" style={{ color: t.textMuted }}>Order #</p>
-                  <p className="text-xl font-bold" style={{ color: gold }}>#{String(order.id).padStart(4, '0')}</p>
+                  <p className="text-lg sm:text-xl font-bold" style={{ color: gold }}>#{String(order.id).padStart(4, '0')}</p>
                 </div>
                 <StatusBadge status={order.status} />
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <div>
                   <p className="text-[10px] uppercase tracking-wider" style={{ color: t.textFaint }}>Type</p>
-                  <p className="text-sm capitalize" style={{ color: t.textPrimary }}>{order.order_type}</p>
+                  <p className="text-xs sm:text-sm capitalize" style={{ color: t.textPrimary }}>{order.order_type}</p>
                 </div>
                 <div>
                   <p className="text-[10px] uppercase tracking-wider" style={{ color: t.textFaint }}>Total</p>
@@ -971,16 +973,16 @@ function StatCard({ icon, label, value, color }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="rounded-xl p-5 flex items-center gap-4"
+      className="rounded-xl p-3 sm:p-5 flex items-center gap-3 sm:gap-4"
       style={{ background: t.cardBg, border: '1px solid ' + t.divider }}
     >
-      <div className="w-11 h-11 rounded-lg flex items-center justify-center"
+      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center flex-shrink-0"
         style={{ background: `${color}18`, color }}>
         {icon}
       </div>
-      <div>
-        <p className="text-[11px] uppercase tracking-wider" style={{ color: t.textMuted }}>{label}</p>
-        <p className="text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{value}</p>
+      <div className="min-w-0">
+        <p className="text-[10px] sm:text-[11px] uppercase tracking-wider truncate" style={{ color: t.textMuted }}>{label}</p>
+        <p className="text-base sm:text-xl font-bold mt-0.5 truncate" style={{ color: t.textPrimary }}>{value}</p>
       </div>
     </motion.div>
   );

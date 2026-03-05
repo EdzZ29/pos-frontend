@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiGrid, FiUsers, FiShoppingBag, FiLayers, FiFileText,
   FiCreditCard, FiLogOut, FiShield, FiShoppingCart, FiBarChart2,
-  FiClock, FiCamera, FiSettings,
+  FiClock, FiCamera, FiSettings, FiMenu, FiX,
 } from 'react-icons/fi';
 import defaultLogo from '../assets/logo.jpg';
 
@@ -42,14 +42,31 @@ function getLinks(role) {
   }
 }
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, setIsOpen }) {
   const { user, logout } = useAuth();
   const { gold, goldDark, goldRgb, systemName, logoUrl, sidebarBg, sidebarWidth, headingFont, t, isDark } = useSettings();
   const navigate = useNavigate();
+  const location = useLocation();
   const role = user?.role?.slug;
   const links = getLinks(role);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const logoSrc = logoUrl || defaultLogo;
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    if (window.innerWidth < 1024) {
+      setIsOpen(false);
+    }
+  }, [location.pathname, setIsOpen]);
+
+  // Close sidebar on escape key
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [setIsOpen]);
 
   const handleLogout = async () => {
     await logout();
@@ -58,7 +75,25 @@ export default function Sidebar() {
 
   return (
     <>
-    <aside className="fixed top-0 left-0 h-screen flex flex-col z-30"
+    {/* Mobile overlay */}
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+    </AnimatePresence>
+
+    {/* Sidebar */}
+    <aside 
+      className={`fixed top-0 left-0 h-screen flex flex-col z-50 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}
       style={{
         width: `${sidebarWidth}px`,
         background: sidebarBg,
@@ -67,16 +102,24 @@ export default function Sidebar() {
     >
       {/* Brand */}
       <div className="flex items-center gap-3 px-5 py-5" style={{ borderBottom: `1px solid ${t.sidebarBorder}` }}>
-        <img src={logoSrc} alt={systemName} className="w-10 h-10 rounded-full object-cover"
+        <img src={logoSrc} alt={systemName} className="w-10 h-10 rounded-full object-cover flex-shrink-0"
           style={{ border: `2px solid ${gold}` }} />
-        <div>
-          <h1 className="text-sm font-bold" style={{ color: '#f5f0e8', fontFamily: headingFont }}>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-sm font-bold truncate" style={{ color: '#f5f0e8', fontFamily: headingFont }}>
             {systemName}
           </h1>
           <span className="text-[10px] uppercase tracking-widest" style={{ color: gold }}>
             {role || 'POS'}
           </span>
         </div>
+        {/* Mobile close button */}
+        <button 
+          onClick={() => setIsOpen(false)}
+          className="lg:hidden p-2 rounded-lg transition-colors hover:bg-white/10"
+          style={{ color: t.textSecondary }}
+        >
+          <FiX size={20} />
+        </button>
       </div>
 
       {/* Navigation */}

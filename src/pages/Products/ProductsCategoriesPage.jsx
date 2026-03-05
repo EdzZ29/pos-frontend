@@ -138,17 +138,17 @@ export default function ProductsCategoriesPage() {
   const totalCategoryPages = Math.max(1, Math.ceil(categories.length / CATS_PER_PAGE));
 
   return (
-    <div className="p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
       {/* Page header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: t.textPrimary }}>Products & Categories</h1>
-        <p className="text-sm mt-1" style={{ color: t.textMuted }}>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold" style={{ color: t.textPrimary }}>Products & Categories</h1>
+        <p className="text-xs sm:text-sm mt-1" style={{ color: t.textMuted }}>
           Manage your product catalog and categories.
         </p>
       </motion.div>
 
       {/* Tab bar */}
-      <div className="flex gap-2 mb-8">
+      <div className="flex gap-2 mb-6 sm:mb-8">
         {[
           { key: 'products', label: 'Products', icon: <FiPackage size={14} /> },
           { key: 'categories', label: 'Categories', icon: <FiTag size={14} /> },
@@ -156,7 +156,7 @@ export default function ProductsCategoriesPage() {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 transition-all"
             style={{
               background: activeTab === tab.key ? gold : t.tableBg,
               color: activeTab === tab.key ? '#000' : t.textSecondary,
@@ -171,12 +171,12 @@ export default function ProductsCategoriesPage() {
       {/* ═══════════════ PRODUCTS TAB ═══════════════ */}
       {activeTab === 'products' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold" style={{ color: t.textPrimary }}>
-              All Products <span className="text-sm font-normal ml-2" style={{ color: t.textMuted }}>({products.length})</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-6">
+            <h2 className="text-base sm:text-lg font-bold" style={{ color: t.textPrimary }}>
+              All Products <span className="text-xs sm:text-sm font-normal ml-2" style={{ color: t.textMuted }}>({products.length})</span>
             </h2>
             <button onClick={openAddProduct}
-              className="px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all hover:opacity-90"
+              className="px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90 w-full sm:w-auto"
               style={{ background: `linear-gradient(135deg, ${gold}, ${goldDark})`, color: '#000' }}>
               <FiPlus size={16} /> Add Product
             </button>

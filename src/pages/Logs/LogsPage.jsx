@@ -11,13 +11,13 @@ import {
 const fmt = (n) => `${(n || 0).toFixed(2)}`;
 
 const StatCard = ({ icon, label, value, color, sub, panelBg, panelBorder, t }) => (
-  <div className="rounded-xl p-5 flex items-center gap-4" style={{ background: panelBg, border: panelBorder }}>
-    <div className="w-11 h-11 rounded-lg flex items-center justify-center"
+  <div className="rounded-xl p-3 sm:p-5 flex items-center gap-2 sm:gap-4" style={{ background: panelBg, border: panelBorder }}>
+    <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center flex-shrink-0"
       style={{ background: `${color}18`, color }}>{icon}</div>
-    <div>
-      <p className="text-[11px] uppercase tracking-wider" style={{ color: t.textMuted }}>{label}</p>
-      <p className="text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{value}</p>
-      {sub && <p className="text-[10px] mt-0.5" style={{ color: t.textFaint }}>{sub}</p>}
+    <div className="min-w-0">
+      <p className="text-[9px] sm:text-[11px] uppercase tracking-wider truncate" style={{ color: t.textMuted }}>{label}</p>
+      <p className="text-base sm:text-xl font-bold mt-0.5 truncate" style={{ color: t.textPrimary }}>{value}</p>
+      {sub && <p className="text-[9px] sm:text-[10px] mt-0.5 truncate" style={{ color: t.textFaint }}>{sub}</p>}
     </div>
   </div>
 );
@@ -160,22 +160,22 @@ export default function LogsPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex items-start justify-between">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: t.textPrimary }}>Shift & Time Logs</h1>
-          <p className="text-sm mt-1" style={{ color: t.textMuted }}>
+          <h1 className="text-xl sm:text-2xl font-bold" style={{ color: t.textPrimary }}>Shift & Time Logs</h1>
+          <p className="text-xs sm:text-sm mt-1" style={{ color: t.textMuted }}>
             Manage user shifts, clock-in/out tracking, and attendance records.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[10px]" style={{ color: t.textFaint }}>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="text-[9px] sm:text-[10px] hidden sm:inline" style={{ color: t.textFaint }}>
             Last updated: {lastRefresh.toLocaleTimeString()}
           </span>
           <button onClick={refreshTimeLogs}
-            className={`p-2 rounded-lg transition ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
+            className={`p-1.5 sm:p-2 rounded-lg transition ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
             style={{ color: gold, border: `1px solid rgba(${goldRgb},0.2)` }} title="Refresh">
             <FiRefreshCw size={14} />
           </button>
@@ -183,12 +183,12 @@ export default function LogsPage() {
       </motion.div>
 
       {/* Action Buttons */}
-      <div className="flex flex-wrap gap-3 mb-6">
+      <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-6">
         <button
           onClick={() => setShowAbsentModal(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
+          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all"
           style={{ background: 'rgba(248,113,113,0.15)', color: '#f87171', border: '1px solid rgba(248,113,113,0.3)' }}>
-          <FiUserX size={16} /> Mark Absent / No Duty
+          <FiUserX size={14} className="sm:hidden" /><FiUserX size={16} className="hidden sm:block" /> <span className="hidden sm:inline">Mark Absent / No Duty</span><span className="sm:hidden">Absent</span>
         </button>
       </div>
 
@@ -198,7 +198,7 @@ export default function LogsPage() {
         <>
           {/* Stat Cards */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-6 sm:mb-8">
             <StatCard icon={<FiActivity size={20} />} label="Active Shifts" value={activeShifts} color="#4ade80" sub="Currently clocked in" panelBg={panelBg} panelBorder={panelBorder} t={t} />
             <StatCard icon={<FiClock size={20} />} label="Today's Logs" value={todayLogs.length} color="#60a5fa" sub={`${fmt(todayHours)} hours total`} panelBg={panelBg} panelBorder={panelBorder} t={t} />
             <StatCard icon={<FiUserX size={20} />} label="Absent Today" value={absentToday} color="#f87171" sub="No duty / absent" panelBg={panelBg} panelBorder={panelBorder} t={t} />
@@ -207,7 +207,7 @@ export default function LogsPage() {
 
           {/* Filters */}
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="flex flex-wrap items-center gap-3 mb-6">
+            className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
             {/* Search */}
             <div className="relative">
               <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: t.textFaint }} />
@@ -257,22 +257,22 @@ export default function LogsPage() {
 
           {/* Time Logs Table */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="rounded-xl overflow-hidden mb-6" style={{ background: panelBg, border: panelBorder }}>
-            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: panelBorder }}>
-              <h2 className="text-sm font-semibold" style={{ color: t.textPrimary }}>
+            className="rounded-xl overflow-hidden mb-4 sm:mb-6" style={{ background: panelBg, border: panelBorder }}>
+            <div className="px-3 sm:px-5 py-3 sm:py-4 flex items-center justify-between" style={{ borderBottom: panelBorder }}>
+              <h2 className="text-xs sm:text-sm font-semibold" style={{ color: t.textPrimary }}>
                 Time Logs
-                <span className="ml-2 text-[10px] uppercase tracking-wider px-2 py-1 rounded-md"
+                <span className="ml-2 text-[9px] sm:text-[10px] uppercase tracking-wider px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md"
                   style={{ background: `rgba(${goldRgb},0.12)`, color: gold }}>
                   {filteredLogs.length} entries
                 </span>
               </h2>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto table-responsive">
+              <table className="w-full text-xs sm:text-sm min-w-[700px]">
                 <thead>
                   <tr style={{ borderBottom: panelBorder }}>
                     {['User', 'Role', 'Clock In', 'Clock Out', 'Duration', 'Status', 'Notes', 'Actions'].map((h) => (
-                      <th key={h} className="px-5 py-3 text-left text-[11px] uppercase tracking-wider font-semibold"
+                      <th key={h} className="px-3 sm:px-5 py-2 sm:py-3 text-left text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold"
                         style={{ color: t.textFaint }}>{h}</th>
                     ))}
                   </tr>
@@ -280,7 +280,7 @@ export default function LogsPage() {
                 <tbody>
                   {paginatedLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-5 py-10 text-center text-sm" style={{ color: t.textFaint }}>
+                      <td colSpan={8} className="px-5 py-10 text-center text-xs sm:text-sm" style={{ color: t.textFaint }}>
                         No time logs found.
                       </td>
                     </tr>
@@ -288,30 +288,30 @@ export default function LogsPage() {
                     paginatedLogs.map((log) => (
                       <tr key={log.id} className={`${isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-black/[0.02]'} transition`}
                         style={{ borderBottom: `1px solid ${t.tableBg}` }}>
-                        <td className="px-5 py-3">
+                        <td className="px-3 sm:px-5 py-2 sm:py-3">
                           <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold"
+                            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold flex-shrink-0"
                               style={{ background: `rgba(${goldRgb},0.15)`, color: gold }}>
                               {log.user?.name?.charAt(0)?.toUpperCase() || '?'}
                             </div>
-                            <span className="font-medium text-xs" style={{ color: t.textPrimary }}>{log.user?.name || 'Unknown'}</span>
+                            <span className="font-medium text-[10px] sm:text-xs whitespace-nowrap" style={{ color: t.textPrimary }}>{log.user?.name || 'Unknown'}</span>
                           </div>
                         </td>
-                        <td className="px-5 py-3">
-                          <span className="text-[10px] uppercase px-2 py-0.5 rounded-md font-semibold"
+                        <td className="px-3 sm:px-5 py-2 sm:py-3">
+                          <span className="text-[9px] sm:text-[10px] uppercase px-1.5 sm:px-2 py-0.5 rounded-md font-semibold whitespace-nowrap"
                             style={{ background: t.divider, color: t.textSecondary }}>
                             {log.user?.role?.name || '—'}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-xs" style={{ color: t.textPrimary }}>{formatDateTime(log.clock_in)}</td>
-                        <td className="px-5 py-3 text-xs" style={{ color: log.clock_out ? t.textPrimary : t.textFaint }}>
+                        <td className="px-3 sm:px-5 py-2 sm:py-3 text-[10px] sm:text-xs whitespace-nowrap" style={{ color: t.textPrimary }}>{formatDateTime(log.clock_in)}</td>
+                        <td className="px-3 sm:px-5 py-2 sm:py-3 text-[10px] sm:text-xs whitespace-nowrap" style={{ color: log.clock_out ? t.textPrimary : t.textFaint }}>
                           {log.status === 'absent' ? '—' : formatDateTime(log.clock_out)}
                         </td>
-                        <td className="px-5 py-3 text-xs font-semibold" style={{ color: gold }}>
+                        <td className="px-3 sm:px-5 py-2 sm:py-3 text-[10px] sm:text-xs font-semibold" style={{ color: gold }}>
                           {log.status === 'absent' ? '—' : formatDuration(log.total_hours)}
                         </td>
-                        <td className="px-5 py-3">
-                          <span className="text-[10px] uppercase px-2 py-0.5 rounded-md font-bold tracking-wide"
+                        <td className="px-3 sm:px-5 py-2 sm:py-3">
+                          <span className="text-[9px] sm:text-[10px] uppercase px-1.5 sm:px-2 py-0.5 rounded-md font-bold tracking-wide whitespace-nowrap"
                             style={{
                               background: log.status === 'active' ? 'rgba(74,222,128,0.12)'
                                 : log.status === 'absent' ? 'rgba(248,113,113,0.12)'
@@ -320,13 +320,13 @@ export default function LogsPage() {
                                 : log.status === 'absent' ? '#f87171'
                                 : '#60a5fa',
                             }}>
-                            {log.status === 'absent' ? 'Absent / No Duty' : log.status}
+                            {log.status === 'absent' ? 'Absent' : log.status}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-xs max-w-[150px] truncate" style={{ color: t.textMuted }}>
+                        <td className="px-3 sm:px-5 py-2 sm:py-3 text-[10px] sm:text-xs max-w-[100px] sm:max-w-[150px] truncate" style={{ color: t.textMuted }}>
                           {log.notes || '—'}
                         </td>
-                        <td className="px-5 py-3">
+                        <td className="px-3 sm:px-5 py-2 sm:py-3">
                           <div className="flex items-center gap-1">
                             {log.status === 'active' && (
                               <button

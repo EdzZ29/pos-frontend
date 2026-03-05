@@ -254,25 +254,25 @@ export default function OwnerDashboard() {
   };
 
   return (
-    <div className="p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
       {/* Page header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex items-start justify-between">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: t.textPrimary }}>Owner Dashboard</h1>
+          <h1 className="text-xl sm:text-2xl font-bold" style={{ color: t.textPrimary }}>Owner Dashboard</h1>
           <p className="text-sm mt-1" style={{ color: t.textMuted }}>
             Welcome back, {user?.name}. Here's your business overview.
           </p>
         </div>
-        <div className="text-right flex-shrink-0 ml-4">
-          <div className="flex items-center gap-2 justify-end mb-1">
+        <div className="text-left sm:text-right flex-shrink-0">
+          <div className="flex items-center gap-2 sm:justify-end mb-1">
             <FiCalendar size={14} style={{ color: gold }} />
-            <span className="text-sm font-semibold" style={{ color: t.textPrimary }}>
+            <span className="text-xs sm:text-sm font-semibold" style={{ color: t.textPrimary }}>
               {currentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </span>
           </div>
-          <div className="flex items-center gap-2 justify-end">
+          <div className="flex items-center gap-2 sm:justify-end">
             <FiClock size={14} style={{ color: gold }} />
-            <span className="text-lg font-bold tabular-nums" style={{ color: gold }}>
+            <span className="text-base sm:text-lg font-bold tabular-nums" style={{ color: gold }}>
               {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </span>
           </div>
@@ -288,7 +288,7 @@ export default function OwnerDashboard() {
       >
         <button
           onClick={openOrderModal}
-          className="w-full sm:w-1/2 py-5 px-6 rounded-2xl flex items-center justify-between group transition-all duration-300"
+          className="w-full sm:w-1/2 lg:w-auto lg:min-w-[320px] py-4 sm:py-5 px-4 sm:px-6 rounded-2xl flex items-center justify-between group transition-all duration-300"
           style={{
             background: `linear-gradient(135deg, ${gold}, ${goldDark})`,
             boxShadow: `0 8px 20px rgba(${goldRgb},0.3)`,
@@ -296,16 +296,18 @@ export default function OwnerDashboard() {
           onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 12px 28px rgba(${goldRgb},0.45)`; e.currentTarget.style.transform = 'translateY(-2px)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 8px 20px rgba(${goldRgb},0.3)`; e.currentTarget.style.transform = 'translateY(0)'; }}
         >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-              <FiPlus size={24} className="text-white" />
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 rounded-full flex items-center justify-center">
+              <FiPlus size={20} className="text-white sm:hidden" />
+              <FiPlus size={24} className="text-white hidden sm:block" />
             </div>
             <div className="text-left">
-              <span className="text-xl font-bold block text-white">Take New Order</span>
-              <span className="text-white/70 text-sm">Start a new transaction</span>
+              <span className="text-lg sm:text-xl font-bold block text-white">Take New Order</span>
+              <span className="text-white/70 text-xs sm:text-sm">Start a new transaction</span>
             </div>
           </div>
-          <FiArrowRight size={24} className="text-white group-hover:translate-x-1 transition-transform" />
+          <FiArrowRight size={20} className="text-white group-hover:translate-x-1 transition-transform sm:hidden" />
+          <FiArrowRight size={24} className="text-white group-hover:translate-x-1 transition-transform hidden sm:block" />
         </button>
       </motion.div>
 
@@ -425,7 +427,7 @@ export default function OwnerDashboard() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4"
             style={{ background: t.modalOverlay, backdropFilter: 'blur(8px)' }}
             onClick={() => resetOrderModal()}
           >
@@ -435,46 +437,46 @@ export default function OwnerDashboard() {
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-6xl overflow-hidden rounded-2xl flex flex-col"
-              style={{ background: t.modalBg, border: t.inputBorder, height: '85vh', fontFamily: "'Inria Sans', sans-serif" }}
+              style={{ background: t.modalBg, border: t.inputBorder, height: '90vh', maxHeight: '90vh', fontFamily: "'Inria Sans', sans-serif" }}
             >
               {/* Modal Header */}
-              <div className="p-5 flex items-center justify-between" style={{ borderBottom: panelBorder }}>
-                <div className="flex items-center gap-6">
-                  <h2 className="text-xl font-bold" style={{ color: t.textPrimary }}>New Order</h2>
-                  <div className="flex items-center gap-2">
+              <div className="p-3 sm:p-5 flex items-center justify-between flex-shrink-0" style={{ borderBottom: panelBorder }}>
+                <div className="flex items-center gap-3 sm:gap-6 flex-1 min-w-0">
+                  <h2 className="text-base sm:text-xl font-bold flex-shrink-0" style={{ color: t.textPrimary }}>New Order</h2>
+                  <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto flex-shrink-0">
                     {[1, 2, 3, 4].map((step) => (
-                      <div key={step} className="flex items-center">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                      <div key={step} className="flex items-center flex-shrink-0">
+                        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold"
                           style={{
                             background: orderStep >= step ? gold : t.inputBorder,
                             color: orderStep >= step ? '#000' : t.textMuted,
                           }}>
-                          {orderStep > step ? <FiCheck size={14} /> : step}
+                          {orderStep > step ? <FiCheck size={12} /> : step}
                         </div>
-                        <span className="ml-1.5 text-xs font-medium hidden md:block"
+                        <span className="ml-1 sm:ml-1.5 text-[10px] sm:text-xs font-medium hidden lg:block"
                           style={{ color: orderStep >= step ? gold : t.textMuted }}>
                           {step === 1 ? 'Items' : step === 2 ? 'Payment' : step === 3 ? 'Confirm' : 'Receipt'}
                         </span>
-                        {step < 4 && <div className="w-6 h-0.5 mx-2" style={{ background: orderStep > step ? gold : t.inputBorder }} />}
+                        {step < 4 && <div className="w-3 sm:w-6 h-0.5 mx-1 sm:mx-2" style={{ background: orderStep > step ? gold : t.inputBorder }} />}
                       </div>
                     ))}
                   </div>
                 </div>
-                <button onClick={resetOrderModal} className={`p-2 rounded-lg ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'} transition`} style={{ color: t.textSecondary }}>
+                <button onClick={resetOrderModal} className={`p-2 rounded-lg ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'} transition flex-shrink-0`} style={{ color: t.textSecondary }}>
                   <FiX size={20} />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-hidden flex">
+              <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
                 {/* ── STEP 1: Select Items ── */}
                 {orderStep === 1 && (
                   <>
                     {/* Menu */}
-                    <div className="flex-1 p-5 overflow-y-auto" style={{ borderRight: panelBorder }}>
-                      <div className="flex flex-wrap gap-2 mb-5">
+                    <div className="flex-1 p-3 sm:p-5 overflow-y-auto" style={{ borderRight: panelBorder }}>
+                      <div className="flex flex-wrap gap-2 mb-4 sm:mb-5">
                         <button
                           onClick={() => setMenuCategory('all')}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize"
+                          className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-all capitalize"
                           style={{
                             background: menuCategory === 'all' ? gold : t.tableBg,
                             color: menuCategory === 'all' ? '#000' : t.textSecondary,
@@ -487,7 +489,7 @@ export default function OwnerDashboard() {
                           <button
                             key={cat.id}
                             onClick={() => setMenuCategory(String(cat.id))}
-                            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize"
+                            className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-all capitalize"
                             style={{
                               background: menuCategory === String(cat.id) ? gold : t.tableBg,
                               color: menuCategory === String(cat.id) ? '#000' : t.textSecondary,
@@ -499,7 +501,7 @@ export default function OwnerDashboard() {
                         ))}
                       </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
                         {filteredMenuProducts.length === 0 ? (
                           <p className="col-span-full text-center py-8 text-sm" style={{ color: t.textFaint }}>
                             No products found.
@@ -511,12 +513,12 @@ export default function OwnerDashboard() {
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
                               onClick={() => addToCart(product)}
-                              className="p-4 rounded-xl text-left transition-all"
+                              className="p-3 sm:p-4 rounded-xl text-left transition-all"
                               style={{ background: t.cardBg, border: panelBorder }}
                             >
-                              <p className="font-medium text-sm mb-1" style={{ color: t.textPrimary }}>{product.name}</p>
-                              <p className="text-xs" style={{ color: t.textMuted }}>{product.category?.name}</p>
-                              <p className="text-sm font-bold mt-2" style={{ color: gold }}>
+                              <p className="font-medium text-xs sm:text-sm mb-1 truncate" style={{ color: t.textPrimary }}>{product.name}</p>
+                              <p className="text-[10px] sm:text-xs truncate" style={{ color: t.textMuted }}>{product.category?.name}</p>
+                              <p className="text-xs sm:text-sm font-bold mt-2" style={{ color: gold }}>
                                 ₱{parseFloat(product.price).toLocaleString('en', { minimumFractionDigits: 2 })}
                               </p>
                             </motion.button>
@@ -525,14 +527,14 @@ export default function OwnerDashboard() {
                       </div>
                     </div>
 
-                    {/* Cart sidebar */}
-                    <div className="w-80 flex flex-col" style={{ background: isDark ? 'rgba(10,10,10,0.5)' : 'rgba(0,0,0,0.02)' }}>
-                      <div className="p-5" style={{ borderBottom: panelBorder }}>
-                        <h3 className="text-sm font-bold mb-4" style={{ color: t.textPrimary }}>Current Order</h3>
-                        <div className="flex gap-2">
+                    {/* Cart sidebar - collapsible on mobile */}
+                    <div className="w-full lg:w-80 flex flex-col flex-shrink-0 max-h-[40vh] lg:max-h-none border-t lg:border-t-0" style={{ background: isDark ? 'rgba(10,10,10,0.5)' : 'rgba(0,0,0,0.02)', borderColor: t.divider }}>
+                      <div className="p-3 sm:p-5" style={{ borderBottom: panelBorder }}>
+                        <h3 className="text-xs sm:text-sm font-bold mb-3 sm:mb-4" style={{ color: t.textPrimary }}>Current Order</h3>
+                        <div className="flex gap-1.5 sm:gap-2">
                           {['dine-in', 'takeout', 'delivery'].map((typ) => (
                             <button key={typ} onClick={() => setOrderType(typ)}
-                              className="flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all"
+                              className="flex-1 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-medium capitalize transition-all"
                               style={{
                                 background: orderType === typ ? gold : t.tableBg,
                                 color: orderType === typ ? '#000' : t.textSecondary,
@@ -544,37 +546,38 @@ export default function OwnerDashboard() {
                         </div>
                       </div>
 
-                      <div className="flex-1 overflow-y-auto p-5">
+                      <div className="flex-1 overflow-y-auto p-3 sm:p-5">
                         {cart.length === 0 ? (
-                          <div className="text-center py-8" style={{ color: t.textFaint }}>
-                            <FiShoppingCart size={40} className="mx-auto mb-3 opacity-50" />
-                            <p className="text-sm">No items yet</p>
+                          <div className="text-center py-4 sm:py-8" style={{ color: t.textFaint }}>
+                            <FiShoppingCart size={32} className="mx-auto mb-2 sm:mb-3 opacity-50 sm:hidden" />
+                            <FiShoppingCart size={40} className="mx-auto mb-3 opacity-50 hidden sm:block" />
+                            <p className="text-xs sm:text-sm">No items yet</p>
                           </div>
                         ) : (
-                          <div className="space-y-3">
+                          <div className="space-y-2 sm:space-y-3">
                             {cart.map((item) => (
-                              <div key={item.product_id} className="flex items-center gap-3 p-3 rounded-lg"
+                              <div key={item.product_id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg"
                                 style={{ background: t.cardBg }}>
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-xs truncate" style={{ color: t.textPrimary }}>{item.name}</p>
-                                  <p className="text-[11px]" style={{ color: gold }}>₱{item.unit_price.toFixed(2)}</p>
+                                  <p className="font-medium text-[10px] sm:text-xs truncate" style={{ color: t.textPrimary }}>{item.name}</p>
+                                  <p className="text-[10px] sm:text-[11px]" style={{ color: gold }}>₱{item.unit_price.toFixed(2)}</p>
                                 </div>
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1 sm:gap-1.5">
                                   <button onClick={() => updateQuantity(item.product_id, -1)}
-                                    className="w-6 h-6 rounded-full flex items-center justify-center"
+                                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center"
                                     style={{ background: t.inputBorder }}>
-                                    <FiMinus size={12} style={{ color: t.textPrimary }} />
+                                    <FiMinus size={10} style={{ color: t.textPrimary }} />
                                   </button>
-                                  <span className="w-5 text-center text-xs font-medium" style={{ color: t.textPrimary }}>{item.quantity}</span>
+                                  <span className="w-4 sm:w-5 text-center text-[10px] sm:text-xs font-medium" style={{ color: t.textPrimary }}>{item.quantity}</span>
                                   <button onClick={() => updateQuantity(item.product_id, 1)}
-                                    className="w-6 h-6 rounded-full flex items-center justify-center"
+                                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center"
                                     style={{ background: gold }}>
-                                    <FiPlus size={12} style={{ color: '#000' }} />
+                                    <FiPlus size={10} style={{ color: '#000' }} />
                                   </button>
                                 </div>
                                 <button onClick={() => removeFromCart(item.product_id)}
-                                  className="p-1.5 hover:bg-red-500/20 rounded-lg transition" style={{ color: '#f87171' }}>
-                                  <FiTrash2 size={14} />
+                                  className="p-1 sm:p-1.5 hover:bg-red-500/20 rounded-lg transition" style={{ color: '#f87171' }}>
+                                  <FiTrash2 size={12} />
                                 </button>
                               </div>
                             ))}
@@ -582,15 +585,15 @@ export default function OwnerDashboard() {
                         )}
                       </div>
 
-                      <div className="p-5" style={{ borderTop: panelBorder }}>
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="text-xs" style={{ color: t.textSecondary }}>Subtotal ({cartItemCount} items)</span>
-                          <span className="text-lg font-bold" style={{ color: gold }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                      <div className="p-3 sm:p-5" style={{ borderTop: panelBorder }}>
+                        <div className="flex justify-between items-center mb-2 sm:mb-3">
+                          <span className="text-[10px] sm:text-xs" style={{ color: t.textSecondary }}>Subtotal ({cartItemCount} items)</span>
+                          <span className="text-base sm:text-lg font-bold" style={{ color: gold }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                         </div>
                         <button
                           onClick={() => setOrderStep(2)}
                           disabled={cart.length === 0}
-                          className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                          className="w-full py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2"
                           style={{
                             background: cart.length > 0 ? `linear-gradient(135deg, ${gold}, ${goldDark})` : 'rgba(255,255,255,0.1)',
                             color: cart.length > 0 ? '#000' : 'rgba(255,255,255,0.3)',
@@ -605,15 +608,16 @@ export default function OwnerDashboard() {
 
                 {/* ── STEP 2: Payment & Discount ── */}
                 {orderStep === 2 && (
-                  <div className="flex-1 p-8 overflow-y-auto flex items-center justify-center">
+                  <div className="flex-1 p-4 sm:p-8 overflow-y-auto flex items-center justify-center">
                     <div className="max-w-lg w-full">
-                      <div className="text-center mb-6">
-                        <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
+                      <div className="text-center mb-4 sm:mb-6">
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full mx-auto mb-3 sm:mb-4 flex items-center justify-center"
                           style={{ background: `rgba(${goldRgb},0.15)` }}>
-                          <FiCreditCard size={28} style={{ color: gold }} />
+                          <FiCreditCard size={22} className="sm:hidden" style={{ color: gold }} />
+                          <FiCreditCard size={28} className="hidden sm:block" style={{ color: gold }} />
                         </div>
-                        <h3 className="text-xl font-bold" style={{ color: t.textPrimary }}>Payment & Discount</h3>
-                        <p className="text-sm mt-1" style={{ color: t.textMuted }}>Select payment method and applicable discount</p>
+                        <h3 className="text-lg sm:text-xl font-bold" style={{ color: t.textPrimary }}>Payment & Discount</h3>
+                        <p className="text-xs sm:text-sm mt-1" style={{ color: t.textMuted }}>Select payment method and applicable discount</p>
                       </div>
 
                       <div className="mb-6">

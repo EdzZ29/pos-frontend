@@ -45,15 +45,15 @@ function RoleBadge({ role }) {
 const StatCard = ({ icon, label, value, color }) => {
   const { t, panelBg, panelBorder } = useSettings();
   return (
-    <div className="rounded-xl p-5 flex items-center gap-4"
+    <div className="rounded-xl p-3 sm:p-5 flex items-center gap-3 sm:gap-4"
       style={{ background: panelBg, border: panelBorder }}>
-      <div className="w-11 h-11 rounded-lg flex items-center justify-center"
+      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center flex-shrink-0"
         style={{ background: `${color}18`, color }}>
         {icon}
       </div>
-      <div>
-        <p className="text-[11px] uppercase tracking-wider" style={{ color: t.textMuted }}>{label}</p>
-        <p className="text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{value}</p>
+      <div className="min-w-0">
+        <p className="text-[10px] sm:text-[11px] uppercase tracking-wider truncate" style={{ color: t.textMuted }}>{label}</p>
+        <p className="text-base sm:text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{value}</p>
       </div>
     </div>
   );
@@ -211,49 +211,49 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: t.textPrimary }}>Users</h1>
-        <p className="text-sm mt-1" style={{ color: t.textMuted }}>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold" style={{ color: t.textPrimary }}>Users</h1>
+        <p className="text-xs sm:text-sm mt-1" style={{ color: t.textMuted }}>
           Manage all system users, edit information, and control access.
         </p>
       </motion.div>
 
       {/* Stat cards */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={<FiUsers size={20} />} label="Total Users" value={users.length} color="#60a5fa" />
-        <StatCard icon={<FiCheckCircle size={20} />} label="Active" value={activeCount} color="#34d399" />
-        <StatCard icon={<FiSlash size={20} />} label="Blocked" value={blockedCount} color="#f87171" />
-        <StatCard icon={<FiShield size={20} />} label="Roles" value={roles.length} color={gold} />
+        className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+        <StatCard icon={<FiUsers size={18} />} label="Total Users" value={users.length} color="#60a5fa" />
+        <StatCard icon={<FiCheckCircle size={18} />} label="Active" value={activeCount} color="#34d399" />
+        <StatCard icon={<FiSlash size={18} />} label="Blocked" value={blockedCount} color="#f87171" />
+        <StatCard icon={<FiShield size={18} />} label="Roles" value={roles.length} color={gold} />
       </motion.div>
 
       {/* Toolbar: search + role filter + register button */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-        className="flex items-center gap-3 mb-5 flex-wrap">
+        className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4 sm:mb-5">
         {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative flex-1 min-w-0 sm:min-w-[200px] sm:max-w-sm">
           <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: t.textFaint }} />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, username, email..."
+            placeholder="Search users..."
             className="w-full pl-9 pr-3 py-2.5 rounded-lg text-xs"
             style={{ ...inputStyle }}
           />
         </div>
 
         {/* Role filter pills */}
-        <div className="flex items-center gap-2">
-          <FiShield size={14} style={{ color: t.textFaint }} />
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0">
+          <FiShield size={14} className="flex-shrink-0" style={{ color: t.textFaint }} />
           {['all', ...roles.map((r) => r.slug)].map((r) => (
             <button
               key={r}
               onClick={() => setRoleFilter(r)}
-              className="px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all"
+              className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider transition-all flex-shrink-0"
               style={{
                 background: roleFilter === r ? gold : t.tableBg,
                 color: roleFilter === r ? '#000' : t.textSecondary,
@@ -265,14 +265,14 @@ export default function UsersPage() {
           ))}
         </div>
 
-        {/* Register button (right-aligned) */}
-        <div className="ml-auto">
+        {/* Register button */}
+        <div className="sm:ml-auto">
           <button
             onClick={openRegister}
-            className="px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all hover:opacity-90 whitespace-nowrap"
+            className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90 whitespace-nowrap"
             style={{ background: `linear-gradient(135deg, ${gold}, ${goldDark})`, color: '#000' }}
           >
-            <FiUserPlus size={16} /> Register New Cashier
+            <FiUserPlus size={16} /> <span className="hidden sm:inline">Register New Cashier</span><span className="sm:hidden">Add User</span>
           </button>
         </div>
       </motion.div>
@@ -282,12 +282,12 @@ export default function UsersPage() {
         className="rounded-xl overflow-hidden"
         style={{ background: panelBg, border: panelBorder }}>
 
-        <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 360px)', overflowY: 'auto' }}>
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto table-responsive" style={{ maxHeight: 'calc(100vh - 360px)', overflowY: 'auto' }}>
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="sticky top-0 z-10" style={{ background: t.bodyBg }}>
               <tr style={{ borderBottom: panelBorder }}>
                 {['#', 'Name', 'Username', 'Email', 'Role', 'Status', 'Joined', 'Actions'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-[11px] uppercase tracking-wider font-semibold whitespace-nowrap"
+                  <th key={h} className="px-3 sm:px-4 py-2 sm:py-3 text-left text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold whitespace-nowrap"
                     style={{ color: t.textFaint }}>
                     {h}
                   </th>

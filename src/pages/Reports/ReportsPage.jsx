@@ -18,13 +18,13 @@ const fmt = (n) => `₱${(n || 0).toLocaleString('en', { minimumFractionDigits: 
 const StatCard = ({ icon, label, value, color, sub }) => {
   const { t, panelBg, panelBorder } = useSettings();
   return (
-    <div className="rounded-xl p-5 flex items-center gap-4" style={{ background: panelBg, border: panelBorder }}>
-      <div className="w-11 h-11 rounded-lg flex items-center justify-center"
+    <div className="rounded-xl p-3 sm:p-5 flex items-center gap-2 sm:gap-4" style={{ background: panelBg, border: panelBorder }}>
+      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center flex-shrink-0"
         style={{ background: `${color}18`, color }}>{icon}</div>
-      <div>
-        <p className="text-[11px] uppercase tracking-wider" style={{ color: t.textMuted }}>{label}</p>
-        <p className="text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{value}</p>
-        {sub && <p className="text-[10px] mt-0.5" style={{ color: t.textFaint }}>{sub}</p>}
+      <div className="min-w-0">
+        <p className="text-[9px] sm:text-[11px] uppercase tracking-wider truncate" style={{ color: t.textMuted }}>{label}</p>
+        <p className="text-base sm:text-xl font-bold mt-0.5 truncate" style={{ color: t.textPrimary }}>{value}</p>
+        {sub && <p className="text-[9px] sm:text-[10px] mt-0.5 truncate" style={{ color: t.textFaint }}>{sub}</p>}
       </div>
     </div>
   );
@@ -348,23 +348,23 @@ export default function ReportsPage() {
   useEffect(() => { setBreakdownPage(1); }, [period, selectedMonth, selectedYear, specificDate]);
 
   return (
-    <div className="p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex items-start justify-between">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: t.textPrimary }}>Reports</h1>
-          <p className="text-sm mt-1" style={{ color: t.textMuted }}>
+          <h1 className="text-xl sm:text-2xl font-bold" style={{ color: t.textPrimary }}>Reports</h1>
+          <p className="text-xs sm:text-sm mt-1" style={{ color: t.textMuted }}>
             Sales analytics, performance metrics, and business insights.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[10px]" style={{ color: t.textFaint }}>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="text-[9px] sm:text-[10px] hidden sm:inline" style={{ color: t.textFaint }}>
             Last updated: {lastRefresh.toLocaleTimeString()}
           </span>
           <button
             onClick={handleManualRefresh}
-            className={`p-2 rounded-lg transition ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
+            className={`p-1.5 sm:p-2 rounded-lg transition ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
             style={{ color: gold, border: `1px solid rgba(${goldRgb},0.2)` }}
             title="Refresh data"
           >
@@ -375,8 +375,9 @@ export default function ReportsPage() {
 
       {/* Period selector + Specific date picker */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-        className="flex items-center gap-2 mb-6 flex-wrap">
-        <FiCalendar size={16} style={{ color: t.textFaint }} />
+        className="flex items-center gap-1.5 sm:gap-2 mb-4 sm:mb-6 flex-wrap">
+        <FiCalendar size={14} className="sm:hidden" style={{ color: t.textFaint }} />
+        <FiCalendar size={16} className="hidden sm:block" style={{ color: t.textFaint }} />
         {['daily', 'weekly'].map((p) => (
           <button
             key={p}

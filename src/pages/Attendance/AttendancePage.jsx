@@ -287,22 +287,22 @@ export default function AttendancePage() {
   const todayLogs = timeLogs.filter((l) => new Date(l.clock_in).toDateString() === new Date().toDateString());
 
   return (
-    <div className="p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex items-start justify-between">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: t.textPrimary }}>Attendance</h1>
-          <p className="text-sm mt-1" style={{ color: t.textMuted }}>
+          <h1 className="text-xl sm:text-2xl font-bold" style={{ color: t.textPrimary }}>Attendance</h1>
+          <p className="text-xs sm:text-sm mt-1" style={{ color: t.textMuted }}>
             Generate QR codes for users and scan to automatically clock-in / clock-out.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[10px]" style={{ color: t.textFaint }}>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="text-[9px] sm:text-[10px] hidden sm:inline" style={{ color: t.textFaint }}>
             Last updated: {lastRefresh.toLocaleTimeString()}
           </span>
           <button onClick={refreshTimeLogs}
-            className={`p-2 rounded-lg transition ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
+            className={`p-1.5 sm:p-2 rounded-lg transition ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/10'}`}
             style={{ color: gold, border: `1px solid rgba(${goldRgb},0.2)` }} title="Refresh">
             <FiRefreshCw size={14} />
           </button>
@@ -311,35 +311,35 @@ export default function AttendancePage() {
 
       {/* Stat Cards */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <div className="rounded-xl p-5 flex items-center gap-4" style={{ background: panelBg, border: panelBorder }}>
-          <div className="w-11 h-11 rounded-lg flex items-center justify-center"
-            style={{ background: 'rgba(74,222,128,0.15)', color: '#4ade80' }}><FiActivity size={20} /></div>
-          <div>
-            <p className="text-[11px] uppercase tracking-wider" style={{ color: t.textMuted }}>Active Shifts</p>
-            <p className="text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{activeShifts}</p>
+        className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 mb-6 sm:mb-8">
+        <div className="rounded-xl p-3 sm:p-5 flex items-center gap-2 sm:gap-4" style={{ background: panelBg, border: panelBorder }}>
+          <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(74,222,128,0.15)', color: '#4ade80' }}><FiActivity size={18} /></div>
+          <div className="min-w-0">
+            <p className="text-[9px] sm:text-[11px] uppercase tracking-wider truncate" style={{ color: t.textMuted }}>Active Shifts</p>
+            <p className="text-base sm:text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{activeShifts}</p>
           </div>
         </div>
-        <div className="rounded-xl p-5 flex items-center gap-4" style={{ background: panelBg, border: panelBorder }}>
-          <div className="w-11 h-11 rounded-lg flex items-center justify-center"
-            style={{ background: 'rgba(96,165,250,0.15)', color: '#60a5fa' }}><FiClock size={20} /></div>
-          <div>
-            <p className="text-[11px] uppercase tracking-wider" style={{ color: t.textMuted }}>Today's Scans</p>
-            <p className="text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{todayLogs.length}</p>
+        <div className="rounded-xl p-3 sm:p-5 flex items-center gap-2 sm:gap-4" style={{ background: panelBg, border: panelBorder }}>
+          <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(96,165,250,0.15)', color: '#60a5fa' }}><FiClock size={18} /></div>
+          <div className="min-w-0">
+            <p className="text-[9px] sm:text-[11px] uppercase tracking-wider truncate" style={{ color: t.textMuted }}>Today's Scans</p>
+            <p className="text-base sm:text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{todayLogs.length}</p>
           </div>
         </div>
-        <div className="rounded-xl p-5 flex items-center gap-4" style={{ background: panelBg, border: panelBorder }}>
-          <div className="w-11 h-11 rounded-lg flex items-center justify-center"
-            style={{ background: `${gold}18`, color: gold }}><FiUsers size={20} /></div>
-          <div>
-            <p className="text-[11px] uppercase tracking-wider" style={{ color: t.textMuted }}>Total Users</p>
-            <p className="text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{users.length}</p>
+        <div className="rounded-xl p-3 sm:p-5 flex items-center gap-2 sm:gap-4 col-span-2 sm:col-span-1" style={{ background: panelBg, border: panelBorder }}>
+          <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ background: `${gold}18`, color: gold }}><FiUsers size={18} /></div>
+          <div className="min-w-0">
+            <p className="text-[9px] sm:text-[11px] uppercase tracking-wider truncate" style={{ color: t.textMuted }}>Total Users</p>
+            <p className="text-base sm:text-xl font-bold mt-0.5" style={{ color: t.textPrimary }}>{users.length}</p>
           </div>
         </div>
       </motion.div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-1.5 sm:gap-2 mb-4 sm:mb-6">
         {[
           { key: 'qr-cards', label: 'QR Codes', icon: <FiUsers size={14} /> },
           { key: 'scanner', label: 'Scan QR', icon: <FiCamera size={14} /> },
@@ -347,7 +347,7 @@ export default function AttendancePage() {
           <button
             key={tab.key}
             onClick={() => { setActiveTab(tab.key); if (tab.key !== 'scanner') stopScanner(); }}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all"
             style={{
               background: activeTab === tab.key ? gold : t.tableBg,
               color: activeTab === tab.key ? '#000' : t.textSecondary,

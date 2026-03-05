@@ -88,27 +88,28 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="p-6 lg:p-8 min-h-screen">
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen">
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex items-start justify-between">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-3" style={{ color: t.textPrimary }}>
-            <FiSettings size={24} style={{ color: gold }} /> Settings
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2 sm:gap-3" style={{ color: t.textPrimary }}>
+            <FiSettings size={20} className="sm:hidden" style={{ color: gold }} />
+            <FiSettings size={24} className="hidden sm:block" style={{ color: gold }} /> Settings
           </h1>
-          <p className="text-sm mt-1" style={{ color: t.textMuted }}>
+          <p className="text-xs sm:text-sm mt-1" style={{ color: t.textMuted }}>
             Manage system appearance, branding, and configuration.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button onClick={handleReset}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-semibold transition"
             style={{ color: t.textSecondary, border: panelBorder }}>
-            <FiRefreshCw size={13} /> Reset Defaults
+            <FiRefreshCw size={12} /> <span className="hidden sm:inline">Reset Defaults</span><span className="sm:hidden">Reset</span>
           </button>
           <button onClick={handleSave}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
+            className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all"
             style={{ background: `linear-gradient(135deg, ${gold}, ${gold}cc)`, color: '#000' }}>
-            <FiSave size={14} /> Save Changes
+            <FiSave size={14} /> Save
           </button>
         </div>
       </motion.div>
@@ -120,29 +121,29 @@ export default function SettingsPage() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-6 right-6 z-50 flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold"
+            className="fixed top-16 sm:top-6 left-4 right-4 sm:left-auto sm:right-6 z-50 flex items-center justify-center sm:justify-start gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold"
             style={{ background: 'rgba(74,222,128,0.15)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.25)', backdropFilter: 'blur(12px)' }}>
             <FiCheck size={16} /> Settings saved successfully
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="flex gap-6 flex-col lg:flex-row">
-        {/* Sidebar Tabs */}
+      <div className="flex gap-4 sm:gap-6 flex-col lg:flex-row">
+        {/* Sidebar Tabs - horizontal on mobile */}
         <div className="lg:w-56 flex-shrink-0">
-          <div className="rounded-xl overflow-hidden" style={{ background: panelBg, border: panelBorder }}>
+          <div className="rounded-xl overflow-hidden flex lg:flex-col overflow-x-auto" style={{ background: panelBg, border: panelBorder }}>
             {sections.map((s) => (
               <button
                 key={s.key}
                 onClick={() => setActiveSection(s.key)}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-all"
+                className="flex-1 lg:flex-none lg:w-full flex items-center justify-center lg:justify-start gap-2 lg:gap-3 px-3 lg:px-4 py-2.5 lg:py-3 text-xs sm:text-sm font-medium transition-all whitespace-nowrap"
                 style={{
                   background: activeSection === s.key ? `${gold}15` : 'transparent',
                   color: activeSection === s.key ? gold : t.textSecondary,
                   borderLeft: activeSection === s.key ? `3px solid ${gold}` : '3px solid transparent',
                 }}
               >
-                <s.icon size={15} /> {s.label}
+                <s.icon size={15} /> <span className="hidden sm:inline lg:inline">{s.label}</span>
               </button>
             ))}
           </div>
