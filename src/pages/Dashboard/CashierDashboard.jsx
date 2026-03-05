@@ -467,12 +467,12 @@ export default function CashierDashboard() {
                 {orderStep === 1 && (
                   <>
                     {/* Menu */}
-                    <div className="flex-1 p-5 overflow-y-auto" style={{ borderRight: '1px solid ' + t.divider }}>
+                    <div className="flex-1 p-3 sm:p-5 overflow-y-auto" style={{ borderRight: '1px solid ' + t.divider }}>
                       {/* Category tabs */}
-                      <div className="flex flex-wrap gap-2 mb-5">
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-1.5 sm:gap-2 mb-4 sm:mb-5">
                         <button
                           onClick={() => setMenuCategory('all')}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize"
+                          className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-medium transition-all text-center truncate"
                           style={{
                             background: menuCategory === 'all' ? gold : t.tableBg,
                             color: menuCategory === 'all' ? '#000' : t.textSecondary,
@@ -485,7 +485,7 @@ export default function CashierDashboard() {
                           <button
                             key={cat.id}
                             onClick={() => setMenuCategory(String(cat.id))}
-                            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize"
+                            className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-medium transition-all text-center truncate"
                             style={{
                               background: menuCategory === String(cat.id) ? gold : t.tableBg,
                               color: menuCategory === String(cat.id) ? '#000' : t.textSecondary,
@@ -624,33 +624,38 @@ export default function CashierDashboard() {
                         <label className="text-xs font-semibold uppercase tracking-wider mb-3 block" style={{ color: t.textSecondary }}>
                           Payment Method
                         </label>
-                        <div className="grid grid-cols-3 gap-3">
-                          {paymentMethods.map((method) => {
-                            const colorMap = {
-                              cash:  { bg: 'rgba(34,197,94,0.15)',  border: '#22c55e', text: '#22c55e' },
-                              gcash: { bg: 'rgba(59,130,246,0.15)', border: '#3b82f6', text: '#3b82f6' },
-                              card:  { bg: 'rgba(245,158,11,0.15)', border: '#f59e0b', text: '#ef4444' },
-                            };
-                            const key = method.name.toLowerCase();
-                            const c = colorMap[key] || { bg: `rgba(${goldRgb},0.15)`, border: gold, text: gold };
-                            const active = selectedPaymentMethod === method.id;
-                            return (
-                              <button
-                                key={method.id}
-                                onClick={() => setSelectedPaymentMethod(method.id)}
-                                className="p-4 rounded-xl text-center transition-all"
-                                style={{
-                                  background: active ? c.bg : t.cardBg,
-                                  border: active ? `2px solid ${c.border}` : t.modalBorder,
-                                }}
-                              >
-                                <FiCreditCard size={20} className="mx-auto mb-2" style={{ color: active ? c.text : t.textSecondary }} />
-                                <span className="text-sm font-medium" style={{ color: active ? c.text : t.textPrimary }}>
-                                  {method.name}
-                                </span>
-                              </button>
-                            );
-                          })}
+                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                          {paymentMethods.length === 0 ? (
+                            <p className="col-span-3 text-center py-4 text-xs" style={{ color: t.textFaint }}>No payment methods available</p>
+                          ) : (
+                            paymentMethods.map((method) => {
+                              const colorMap = {
+                                cash:  { bg: 'rgba(34,197,94,0.15)',  border: '#22c55e', text: '#22c55e' },
+                                gcash: { bg: 'rgba(59,130,246,0.15)', border: '#3b82f6', text: '#3b82f6' },
+                                card:  { bg: 'rgba(245,158,11,0.15)', border: '#f59e0b', text: '#ef4444' },
+                              };
+                              const key = method.name.toLowerCase();
+                              const c = colorMap[key] || { bg: `rgba(${goldRgb},0.15)`, border: gold, text: gold };
+                              const active = selectedPaymentMethod === method.id;
+                              return (
+                                <button
+                                  key={method.id}
+                                  onClick={() => setSelectedPaymentMethod(method.id)}
+                                  className="p-3 sm:p-4 rounded-xl text-center transition-all"
+                                  style={{
+                                    background: active ? c.bg : t.cardBg,
+                                    border: active ? `2px solid ${c.border}` : t.modalBorder,
+                                  }}
+                                >
+                                  <FiCreditCard size={18} className="mx-auto mb-1.5 sm:mb-2 sm:hidden" style={{ color: active ? c.text : t.textSecondary }} />
+                                  <FiCreditCard size={20} className="mx-auto mb-2 hidden sm:block" style={{ color: active ? c.text : t.textSecondary }} />
+                                  <span className="text-xs sm:text-sm font-medium" style={{ color: active ? c.text : t.textPrimary }}>
+                                    {method.name}
+                                  </span>
+                                </button>
+                              );
+                            })
+                          )}
                         </div>
                       </div>
 
