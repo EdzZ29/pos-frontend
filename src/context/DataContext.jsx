@@ -11,6 +11,7 @@ import { useAuth } from './AuthContext';
 import {
   productService,
   categoryService,
+  addonService,
   orderService,
   userService,
   paymentService,
@@ -28,6 +29,7 @@ export function DataProvider({ children }) {
   // ── shared data ──────────────────────────────────────────────────────────
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [addons, setAddons] = useState([]);
   const [orders, setOrders] = useState([]);
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -48,6 +50,11 @@ export function DataProvider({ children }) {
   const fetchCategories = useCallback(async () => {
     const data = await categoryService.getAll();
     setCategories(data);
+  }, []);
+
+  const fetchAddons = useCallback(async () => {
+    const data = await addonService.getAll();
+    setAddons(data);
   }, []);
 
   const fetchOrders = useCallback(async () => {
@@ -91,6 +98,7 @@ export function DataProvider({ children }) {
       await Promise.all([
         fetchProducts(),
         fetchCategories(),
+        fetchAddons(),
         fetchOrders(),
         fetchPayments(),
         fetchPaymentMethods(),
@@ -110,6 +118,7 @@ export function DataProvider({ children }) {
     isAuthenticated,
     fetchProducts,
     fetchCategories,
+    fetchAddons,
     fetchOrders,
     fetchPayments,
     fetchPaymentMethods,
@@ -128,6 +137,7 @@ export function DataProvider({ children }) {
       // Clear everything on logout
       setProducts([]);
       setCategories([]);
+      setAddons([]);
       setOrders([]);
       setUsers([]);
       setRoles([]);
@@ -146,6 +156,7 @@ export function DataProvider({ children }) {
       Promise.all([
         fetchProducts(),
         fetchCategories(),
+        fetchAddons(),
         fetchOrders(),
         fetchPayments(),
         fetchTimeLogs(),
@@ -153,13 +164,14 @@ export function DataProvider({ children }) {
       ]).catch(() => {});
     }, BG_INTERVAL);
     return () => clearInterval(id);
-  }, [isAuthenticated, fetchProducts, fetchCategories, fetchOrders, fetchPayments, fetchTimeLogs, fetchUsers]);
+  }, [isAuthenticated, fetchProducts, fetchCategories, fetchAddons, fetchOrders, fetchPayments, fetchTimeLogs, fetchUsers]);
 
   // ── context value ─────────────────────────────────────────────────────────
   const value = {
     // data
     products,
     categories,
+    addons,
     orders,
     users,
     roles,
@@ -171,6 +183,7 @@ export function DataProvider({ children }) {
     // per-entity refresh (call after mutations)
     refreshProducts: fetchProducts,
     refreshCategories: fetchCategories,
+    refreshAddons: fetchAddons,
     refreshOrders: fetchOrders,
     refreshPayments: fetchPayments,
     refreshPaymentMethods: fetchPaymentMethods,

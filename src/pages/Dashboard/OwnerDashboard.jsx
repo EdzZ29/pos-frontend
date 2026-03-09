@@ -47,6 +47,7 @@ export default function OwnerDashboard() {
   const {
     products,
     categories,
+    addons: allAddons,
     orders,
     users,
     payments,
@@ -115,6 +116,19 @@ export default function OwnerDashboard() {
   const [receiptData, setReceiptData] = useState(null);
   const receiptRef = useRef(null);
 
+  // Product selection modal state (for add-ons and notes)
+  const [addonModalOpen, setAddonModalOpen] = useState(false);
+  const [addonProduct, setAddonProduct] = useState(null);
+  const [selectedAddons, setSelectedAddons] = useState([]);
+  const [itemNote, setItemNote] = useState('');
+  const [selectedVariant, setSelectedVariant] = useState(null);
+
+  // Filter available addons
+  const addons = useMemo(
+    () => (allAddons || []).filter((a) => a.is_available !== false),
+    [allAddons]
+  );
+
   /* persist modal state to sessionStorage */
   useEffect(() => {
     if (orderModalOpen && orderStep < 4) {
@@ -145,20 +159,60 @@ export default function OwnerDashboard() {
     // Data is already in DataContext cache – no fetch needed
   };
 
-  const addToCart = (product) => {
-    const existing = cart.find((c) => c.product_id === product.id);
-    if (existing) {
-      setCart(cart.map((c) => c.product_id === product.id ? { ...c, quantity: c.quantity + 1 } : c));
-    } else {
-      setCart([...cart, { product_id: product.id, name: product.name, unit_price: parseFloat(product.price), quantity: 1 }]);
+  const addToCart = (product, productAddons = [], note = '', variant = null) => {
+    // Create unique key for items with different addons/notes
+    const addonKey = productAddons.map(a => a.id).sort().join('-');
+    const variantKey = variant ? `_${variant.id}` : '';
+    const cart_key = `${product.id}_${addonKey}${variantKey}_${Date.now()}`;
+    
+    // If variant exists, use variant price as full price; otherwise use product.price
+    const basePrice = variant ? parseFloat(variant.additional_price) : parseFloat(product.price);
+    
+    setCart([...cart, {
+      cart_key,
+      product_id: product.id,
+      name: product.name,
+      unit_price: basePrice,
+      quantity: 1,
+      addons: productAddons,
+      note: note,
+      variant: variant,
+    }]);
+  };
+
+  const openAddonModal = (product) => {
+    setAddonProduct(product);
+    setSelectedAddons([]);
+    setItemNote('');
+    // Default to first variant if product has variants
+    setSelectedVariant(product.variants && product.variants.length > 0 ? product.variants[0] : null);
+    setAddonModalOpen(true);
+  };
+
+  const toggleAddon = (addon) => {
+    setSelectedAddons(prev => {
+      const exists = prev.find(a => a.id === addon.id);
+      if (exists) return prev.filter(a => a.id !== addon.id);
+      return [...prev, addon];
+    });
+  };
+
+  const confirmAddWithAddons = () => {
+    if (addonProduct) {
+      addToCart(addonProduct, selectedAddons, itemNote, selectedVariant);
+      setAddonModalOpen(false);
+      setAddonProduct(null);
+      setSelectedAddons([]);
+      setItemNote('');
+      setSelectedVariant(null);
     }
   };
 
-  const removeFromCart = (productId) => setCart(cart.filter((c) => c.product_id !== productId));
+  const removeFromCart = (cartKey) => setCart(cart.filter((c) => c.cart_key !== cartKey));
 
-  const updateQuantity = (productId, delta) => {
+  const updateQuantity = (cartKey, delta) => {
     setCart(cart.map((c) => {
-      if (c.product_id === productId) {
+      if (c.cart_key === cartKey) {
         const newQty = c.quantity + delta;
         return newQty > 0 ? { ...c, quantity: newQty } : c;
       }
@@ -166,11 +220,18 @@ export default function OwnerDashboard() {
     }).filter((c) => c.quantity > 0));
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+  const cartTotal = cart.reduce((sum, item) => {
+    const addonTotal = item.addons?.reduce((s, a) => s + parseFloat(a.price), 0) || 0;
+    return sum + (item.unit_price + addonTotal) * item.quantity;
+  }, 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Takeout fee
+  const takeoutFee = orderType === 'takeout' ? 5 : 0;
+
   const discountRate = discountType === 'senior' || discountType === 'pwd' ? 0.20 : 0;
   const discountAmount = Math.round(cartTotal * discountRate * 100) / 100;
-  const finalTotal = cartTotal - discountAmount;
+  const finalTotal = cartTotal - discountAmount + takeoutFee;
   const changeAmount = amountPaid ? Math.max(0, parseFloat(amountPaid) - finalTotal) : 0;
 
   const completeOrder = async () => {
@@ -508,12 +569,12 @@ export default function OwnerDashboard() {
                           </p>
                         ) : (
                           filteredMenuProducts.map((product) => (
-                            <motion.button
+                            <motion.div
                               key={product.id}
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
-                              onClick={() => addToCart(product)}
-                              className="p-3 sm:p-4 rounded-xl text-left transition-all"
+                              onClick={() => openAddonModal(product)}
+                              className="p-3 sm:p-4 rounded-xl text-left transition-all cursor-pointer"
                               style={{ background: t.cardBg, border: panelBorder }}
                             >
                               <p className="font-medium text-xs sm:text-sm mb-1 truncate" style={{ color: t.textPrimary }}>{product.name}</p>
@@ -521,7 +582,7 @@ export default function OwnerDashboard() {
                               <p className="text-xs sm:text-sm font-bold mt-2" style={{ color: gold }}>
                                 ₱{parseFloat(product.price).toLocaleString('en', { minimumFractionDigits: 2 })}
                               </p>
-                            </motion.button>
+                            </motion.div>
                           ))
                         )}
                       </div>
@@ -556,26 +617,40 @@ export default function OwnerDashboard() {
                         ) : (
                           <div className="space-y-2 sm:space-y-3">
                             {cart.map((item) => (
-                              <div key={item.product_id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg"
+                              <div key={item.cart_key || item.product_id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg"
                                 style={{ background: t.cardBg }}>
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-[10px] sm:text-xs truncate" style={{ color: t.textPrimary }}>{item.name}</p>
-                                  <p className="text-[10px] sm:text-[11px]" style={{ color: gold }}>₱{item.unit_price.toFixed(2)}</p>
+                                  <p className="font-medium text-[10px] sm:text-xs truncate" style={{ color: t.textPrimary }}>
+                                    {item.name}{item.variant && ` (${item.variant.name})`}
+                                  </p>
+                                  {item.addons && item.addons.length > 0 && (
+                                    <p className="text-[11px] sm:text-xs mt-0.5" style={{ color: t.textMuted }}>
+                                      +{item.addons.map(a => a.name).join(', ')}
+                                    </p>
+                                  )}
+                                  {item.note && (
+                                    <p className="text-[11px] sm:text-xs mt-0.5 italic" style={{ color: t.textFaint }}>
+                                      "{item.note}"
+                                    </p>
+                                  )}
+                                  <p className="text-[10px] sm:text-[11px] mt-1" style={{ color: gold }}>
+                                    ₱{(item.unit_price + (item.addons?.reduce((s, a) => s + parseFloat(a.price), 0) || 0)).toFixed(2)}
+                                  </p>
                                 </div>
                                 <div className="flex items-center gap-1 sm:gap-1.5">
-                                  <button onClick={() => updateQuantity(item.product_id, -1)}
+                                  <button onClick={() => updateQuantity(item.cart_key, -1)}
                                     className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center"
                                     style={{ background: t.inputBorder }}>
                                     <FiMinus size={10} style={{ color: t.textPrimary }} />
                                   </button>
                                   <span className="w-4 sm:w-5 text-center text-[10px] sm:text-xs font-medium" style={{ color: t.textPrimary }}>{item.quantity}</span>
-                                  <button onClick={() => updateQuantity(item.product_id, 1)}
+                                  <button onClick={() => updateQuantity(item.cart_key, 1)}
                                     className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center"
                                     style={{ background: gold }}>
                                     <FiPlus size={10} style={{ color: '#000' }} />
                                   </button>
                                 </div>
-                                <button onClick={() => removeFromCart(item.product_id)}
+                                <button onClick={() => removeFromCart(item.cart_key)}
                                   className="p-1 sm:p-1.5 hover:bg-red-500/20 rounded-lg transition" style={{ color: '#f87171' }}>
                                   <FiTrash2 size={12} />
                                 </button>
@@ -586,9 +661,19 @@ export default function OwnerDashboard() {
                       </div>
 
                       <div className="p-3 sm:p-5" style={{ borderTop: panelBorder }}>
-                        <div className="flex justify-between items-center mb-2 sm:mb-3">
+                        <div className="flex justify-between items-center mb-1">
                           <span className="text-[10px] sm:text-xs" style={{ color: t.textSecondary }}>Subtotal ({cartItemCount} items)</span>
-                          <span className="text-base sm:text-lg font-bold" style={{ color: gold }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                          <span className="text-xs sm:text-sm" style={{ color: t.textPrimary }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        {takeoutFee > 0 && (
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[10px] sm:text-xs" style={{ color: t.textSecondary }}>Takeout Fee</span>
+                            <span className="text-xs sm:text-sm" style={{ color: t.textPrimary }}>₱{takeoutFee.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center mb-2 sm:mb-3 pt-1" style={{ borderTop: `1px solid ${t.divider}` }}>
+                          <span className="text-[10px] sm:text-xs font-semibold" style={{ color: t.textPrimary }}>Total</span>
+                          <span className="text-base sm:text-lg font-bold" style={{ color: gold }}>₱{(cartTotal + takeoutFee).toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                         </div>
                         <button
                           onClick={() => setOrderStep(2)}
@@ -694,6 +779,12 @@ export default function OwnerDashboard() {
                           <span style={{ color: t.textSecondary }}>Subtotal ({cartItemCount} items)</span>
                           <span style={{ color: t.textPrimary }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                         </div>
+                        {takeoutFee > 0 && (
+                          <div className="flex justify-between text-sm mb-2">
+                            <span style={{ color: t.textSecondary }}>Takeout Fee</span>
+                            <span style={{ color: t.textPrimary }}>₱{takeoutFee.toFixed(2)}</span>
+                          </div>
+                        )}
                         {discountType !== 'none' && (
                           <div className="flex justify-between text-sm mb-2">
                             <span style={{ color: '#34d399' }}>{discountType === 'senior' ? 'Senior' : 'PWD'} Discount (20%)</span>
@@ -786,6 +877,12 @@ export default function OwnerDashboard() {
                             <span style={{ color: t.textSecondary }}>Subtotal</span>
                             <span style={{ color: t.textPrimary }}>₱{cartTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
                           </div>
+                          {takeoutFee > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span style={{ color: t.textSecondary }}>Takeout Fee</span>
+                              <span style={{ color: t.textPrimary }}>₱{takeoutFee.toFixed(2)}</span>
+                            </div>
+                          )}
                           {discountType !== 'none' && (
                             <div className="flex justify-between text-sm">
                               <span style={{ color: '#34d399' }}>{discountType === 'senior' ? 'Senior' : 'PWD'} Discount (20%)</span>
@@ -950,6 +1047,198 @@ export default function OwnerDashboard() {
                     </div>
                   </div>
                 )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}      </AnimatePresence>
+
+      {/* ──────────── PRODUCT SELECTION MODAL (Add-ons & Notes) ──────────── */}
+      <AnimatePresence>
+        {addonModalOpen && addonProduct && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+            style={{ background: t.modalOverlay, backdropFilter: 'blur(8px)' }}
+            onClick={() => setAddonModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-lg overflow-hidden rounded-2xl"
+              style={{ background: t.modalBg, border: `1px solid ${t.inputBorder}` }}
+            >
+              {/* Product Header */}
+              <div className="p-5" style={{ borderBottom: '1px solid ' + t.divider }}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold" style={{ color: t.textPrimary }}>
+                      {addonProduct.name}
+                    </h3>
+                    <p className="text-xs mt-1" style={{ color: t.textMuted }}>
+                      {addonProduct.category?.name || 'Uncategorized'}
+                    </p>
+                  </div>
+                  <p className="text-xl font-bold" style={{ color: gold }}>
+                    ₱{parseFloat(addonProduct.price).toLocaleString('en', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                {addonProduct.description && (
+                  <p className="text-sm mt-3" style={{ color: t.textSecondary }}>
+                    {addonProduct.description}
+                  </p>
+                )}
+              </div>
+
+              <div className="p-5 max-h-[50vh] overflow-y-auto space-y-5">
+                {/* Size Selector - only show if product has variants */}
+                {addonProduct.variants && addonProduct.variants.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: t.textMuted }}>
+                      Size
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {addonProduct.variants.map((variant) => {
+                        const isSelected = selectedVariant?.id === variant.id;
+                        return (
+                          <button
+                            key={variant.id}
+                            onClick={() => setSelectedVariant(variant)}
+                            className="py-2.5 px-3 rounded-xl text-sm font-semibold transition flex flex-col items-center"
+                            style={{
+                              background: isSelected ? gold : t.cardBg,
+                              color: isSelected ? '#000' : t.textPrimary,
+                              border: `1px solid ${isSelected ? gold : t.divider}`,
+                            }}
+                          >
+                            <span>{variant.name}</span>
+                            <span className="text-xs mt-0.5" style={{ color: isSelected ? '#000' : gold }}>
+                              ₱{parseFloat(variant.additional_price).toFixed(2)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add-ons Section */}
+                {(() => {
+                  const filteredAddons = addons.filter(a => {
+                    const categoryMatch = !a.category_id || a.category_id === addonProduct.category_id;
+                    const productMatch = !a.product_id || a.product_id === addonProduct.id;
+                    return categoryMatch && productMatch;
+                  });
+                  return (
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: t.textMuted }}>
+                        Add-ons (Optional)
+                      </h4>
+                      {filteredAddons.length === 0 ? (
+                        <p className="text-center py-4 text-sm rounded-xl" style={{ color: t.textFaint, background: t.cardBg }}>
+                          No add-ons available for this product
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {filteredAddons.map((addon) => {
+                            const isSelected = selectedAddons.some(a => a.id === addon.id);
+                            return (
+                              <button
+                                key={addon.id}
+                                onClick={() => toggleAddon(addon)}
+                                className="p-4 rounded-xl text-center transition-all relative"
+                                style={{
+                                  background: isSelected ? `rgba(${goldRgb},0.15)` : t.cardBg,
+                                  border: isSelected ? `2px solid ${gold}` : `1px solid ${t.divider}`,
+                                }}
+                              >
+                                {isSelected && (
+                                  <div className="absolute top-2 right-2">
+                                    <FiCheck size={14} style={{ color: gold }} />
+                                  </div>
+                                )}
+                                <p className="font-semibold text-sm mb-1" style={{ color: t.textPrimary }}>{addon.name}</p>
+                                {addon.description && (
+                                  <p className="text-[10px] mb-2 line-clamp-2" style={{ color: t.textMuted }}>{addon.description}</p>
+                                )}
+                                <p className="text-sm font-bold" style={{ color: gold }}>
+                                  +₱{parseFloat(addon.price).toFixed(2)}
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Notes Section */}
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: t.textMuted }}>
+                    Special Instructions (Optional)
+                  </h4>
+                  <textarea
+                    value={itemNote}
+                    onChange={(e) => setItemNote(e.target.value)}
+                    placeholder="E.g. No onions, extra spicy, well done..."
+                    rows={3}
+                    className="w-full px-3 py-2.5 rounded-xl text-sm resize-none"
+                    style={{ 
+                      background: t.cardBg, 
+                      border: `1px solid ${t.divider}`, 
+                      color: t.textPrimary,
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Footer with total and buttons */}
+              <div className="p-5" style={{ borderTop: '1px solid ' + t.divider }}>
+                {/* Price breakdown */}
+                <div className="mb-4 p-3 rounded-xl" style={{ background: t.cardBg }}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span style={{ color: t.textSecondary }}>
+                      {selectedVariant ? `Price (${selectedVariant.name})` : 'Price'}
+                    </span>
+                    <span style={{ color: t.textPrimary }}>
+                      ₱{(selectedVariant ? parseFloat(selectedVariant.additional_price) : parseFloat(addonProduct.price)).toFixed(2)}
+                    </span>
+                  </div>
+                  {selectedAddons.length > 0 && (
+                    <div className="flex justify-between text-sm mb-1">
+                      <span style={{ color: t.textSecondary }}>Add-ons ({selectedAddons.length})</span>
+                      <span style={{ color: gold }}>+₱{selectedAddons.reduce((s, a) => s + parseFloat(a.price), 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm font-bold pt-2 mt-2" style={{ borderTop: `1px solid ${t.divider}` }}>
+                    <span style={{ color: t.textPrimary }}>Total</span>
+                    <span style={{ color: gold }}>
+                      ₱{((selectedVariant ? parseFloat(selectedVariant.additional_price) : parseFloat(addonProduct.price)) + selectedAddons.reduce((s, a) => s + parseFloat(a.price), 0)).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setAddonModalOpen(false)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition"
+                    style={{ background: t.divider, color: t.textPrimary }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmAddWithAddons}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2"
+                    style={{ background: `linear-gradient(135deg, ${gold}, ${goldDark})`, color: '#000' }}
+                  >
+                    <FiPlus size={14} /> Add to Order
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>

@@ -4,6 +4,8 @@ export { default as roleService } from './roleService';
 export { default as userService } from './userService';
 export { default as categoryService } from './categoryService';
 export { default as productService } from './productService';
+export { default as addonService } from './addonService';
+export { default as variantService } from './variantService';
 export { default as orderService } from './orderService';
 export { default as paymentService } from './paymentService';
 export { default as timeLogService } from './timeLogService';
