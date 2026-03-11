@@ -33,7 +33,7 @@ export default function ProtectedRoute({ children, roles }) {
       >
         {/* Animated spinner */}
         <div
-          className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin"
+          className="w-14 h-14 rounded-full border-4 border-t-transparent animate-spin"
           style={{ borderColor: `${gold} transparent transparent transparent` }}
         />
         <p className="text-sm font-medium animate-pulse" style={{ color: gold, fontFamily: "'Inria Sans', sans-serif" }}>
