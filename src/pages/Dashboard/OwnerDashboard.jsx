@@ -612,7 +612,7 @@ export default function OwnerDashboard() {
                           <div className="text-center py-4 sm:py-8" style={{ color: t.textFaint }}>
                             <FiShoppingCart size={32} className="mx-auto mb-2 sm:mb-3 opacity-50 sm:hidden" />
                             <FiShoppingCart size={40} className="mx-auto mb-3 opacity-50 hidden sm:block" />
-                            <p className="text-xs sm:text-sm">No items yet</p>
+                            <p className="text-xs sm:text-sm">No items yet.</p>
                           </div>
                         ) : (
                           <div className="space-y-2 sm:space-y-3">
