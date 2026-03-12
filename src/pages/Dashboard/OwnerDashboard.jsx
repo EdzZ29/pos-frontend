@@ -1139,7 +1139,7 @@ export default function OwnerDashboard() {
                       </h4>
                       {filteredAddons.length === 0 ? (
                         <p className="text-center py-4 text-sm rounded-xl" style={{ color: t.textFaint, background: t.cardBg }}>
-                          No add-ons available for this product
+                          No add-ons available for this product.
                         </p>
                       ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
